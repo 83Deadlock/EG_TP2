@@ -1,3 +1,4 @@
+from mimetypes import init
 from lark import Discard
 from lark import Lark,Token,Tree
 from lark.tree import pydot__tree_to_png
@@ -7,9 +8,14 @@ from numpy import size
 class MyInterpreter (Interpreter):
     def __init__(self):
         self.output = {}
-        self.warnings = []
-        self.errors = []
+        self.warnings = set()
+        self.errors = set()
         self.correct = True
+        self.inCicle = False
+        self.if_count = 0
+        self.if_depth = {}
+        self.nivel_if = 0
+
         self.atomic_vars = dict()
         # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
 
@@ -22,28 +28,26 @@ class MyInterpreter (Interpreter):
         print(self.TAG + "\n\tSTART")
         self.visit(tree.children[1])
         print(self.TAG + "\n\tFINISH")
-
-        for p in self.atomic_vars.items():
-            print(p)
-        for p in self.struct_vars.items():
-            print(p)
-
-        if(not self.correct):
-            print("ERRORS => " + str(self.errors))
         
         for var in self.atomic_vars.keys():
             if self.atomic_vars[var][2] == 0 and self.atomic_vars[var][3] == 0:
-                self.warnings.append("Variable \"" + var + "\" was never used nor initialized.")
+                self.warnings.add("Variable \"" + var + "\" was never used nor initialized.")
             elif self.atomic_vars[var][2] == 1 and self.atomic_vars[var][3] == 0:
-                self.warnings.append("Variable \"" + var + "\" was never used.")
-
+                self.warnings.add("Variable \"" + var + "\" was never used.")
         for var in self.struct_vars.keys():
             if self.struct_vars[var][3] == 0:
-                self.warnings.append("Variable \"" + var + "\" was never used.")
-            
-        print("WARNINGS => " + str(self.warnings))
+                self.warnings.add("Variable \"" + var + "\" was never used.")
 
-        pass
+
+        self.output["atomic_vars"] = self.atomic_vars
+        self.output["struct_vars"] = self.struct_vars
+        self.output["correct"] = self.correct
+        self.output["errors"] = self.errors
+        self.output["warnings"] = self.warnings
+        self.output["if_count"] = self.if_count
+        self.output["if_depth"] = self.if_depth
+
+        return self.output
 
     def program(self, tree):
         for c in tree.children:
@@ -79,7 +83,7 @@ class MyInterpreter (Interpreter):
 
         if(var_name in self.atomic_vars.keys() or var_name in self.struct_vars.keys()):
             self.correct = False
-            self.errors.append("Variable \"" + var_name + "\" declared more than once!")
+            self.errors.add("Variable \"" + var_name + "\" declared more than once!")
             return
 
         var_value = None
@@ -184,17 +188,269 @@ class MyInterpreter (Interpreter):
             sizeD = len(ret)
         
         self.struct_vars[tree.children[0].value] = ("dict", sizeD, ret, 0)
-                  
-                
 
+    def atrib(self,tree):
+        if str(tree.children[0]) not in self.atomic_vars.keys():
+            self.errors.add("Variable \"" + tree.children[0] + "\" was not declared")
+            self.correct = False
+        else:
+            typeV = self.atomic_vars[str(tree.children[0])][0]
+            valueV = self.visit(tree.children[2])
+            self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
+            
+        pass
 
+    def initcicle(self, tree):
+        if str(tree.children[0]) not in self.atomic_vars.keys():
+            self.errors.add("Variable \"" + tree.children[0] + "\" was not declared")
+            self.correct = False
+        else:
+            typeV = self.atomic_vars[tree.children[0]][0]
+            valueV = self.visit(tree.children[2])
+            self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
 
+    def print(self,tree):
+        if tree.children[1].type == "VARNAME":
+            if str(tree.children[1]) not in self.atomic_vars.keys():
+                self.errors.add("Variable \"" + tree.children[1] + "\" was not declared")
+                self.correct = False
+            elif not self.atomic_vars[str(tree.children[1])][2]:
+                self.errors.add("Variable \"" + tree.children[1] + "\" declared but not initialized")
+                self.correct = False
+            else:
+                print("> " + str(self.atomic_vars[tree.children[1]][1]))
+            
+        elif tree.children[1].type == "ESCAPED_STRING":
+            s = tree.children[1]
+            s = s.replace("\"","")
+            print("> " + s)
+            
+        pass
+
+    def cond(self,tree):
+        self.if_count += 1
+        self.if_depth[self.if_count] = self.nivel_if
+        l = len(tree.children)
+
+        self.visit(tree.children[2])
+
+        self.visit(tree.children[4])     
+
+        if(tree.children[(l-2)] == "else"):
+            self.visit(tree.children[(l-1)])
+            print("Existe um else")
+
+        pass
+
+    def ciclewhile(self,tree):
+        aux = self.nivel_if 
+        self.nivel_if = 0
+        self.inCicle = True
+        self.visit(tree.children[4])
+        self.inCicle = False
+        self.nivel_if = aux
+        pass
+
+    def ciclefor(self,tree):
+        aux = self.nivel_if 
+        self.nivel_if = 0
+        self.inCicle = True
+        for c in tree.children:
+            if c != "for" and c != "(" and c != ")" and c != ";" and c != ",":
+                self.visit(c)
+        self.inCicle = False
+        self.nivel_if = aux
+
+    def inc(self, tree):
+        typeV = self.atomic_vars[str(tree.children[0])][0]
+        valueV = self.atomic_vars[str(tree.children[0])][1] + 1
+        self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
+        
+        pass
+
+    def dec(self, tree):
+        typeV = self.atomic_vars[str(tree.children[0])][0]
+        valueV = self.atomic_vars[str(tree.children[0])][1] - 1
+        self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
+
+    def ciclerepeat(self,tree):
+        #print(tree.pretty())
+        aux = self.nivel_if 
+        self.nivel_if = 0
+        self.inCicle = True
+        self.visit(tree.children[4])
+        self.inCicle = False
+        self.nivel_if = aux
+        pass
+
+    def body(self,tree):
+        self.visit_children(tree)
+        pass
+
+    def open(self,tree):
+        if not self.inCicle:
+            self.nivel_if += 1
+        pass
+
+    def close(self,tree):
+        self.nivel_if -= 1
+        pass
+
+    def op(self,tree):
+        if(len(tree.children) > 1):
+            if(tree.children[0] == "!"):
+                r = int(self.visit(tree.children[1]))
+                if r == 0: r = 1
+                else: r = 0
+            elif(tree.children[1] == "&"):
+                t1 = self.visit(tree.children[0])
+                t2 = self.visit(tree.children[2])
+                if t1 and t2:
+                    r = 1
+                else:
+                    r = 0
+            elif(tree.children[1] == "#"):
+                t1 = self.visit(tree.children[0])
+                t2 = self.visit(tree.children[2])
+                if t1 or t2:
+                    r = 1
+                else:
+                    r = 0
+        else:
+            r = self.visit(tree.children[0])
+        return r
+
+    def factcond(self,tree):
+        if len(tree.children) > 1:
+            t1 = self.visit(tree.children[0])
+            t2 = self.visit(tree.children[2])
+            if tree.children[1] == "<=":
+                if t1 <= t2:
+                    r = 1
+                else:
+                    r = 0
+            elif tree.children[1] == "<":
+                if t1 < t2:
+                    r = 1
+                else:
+                    r = 0
+            elif tree.children[1] == ">=":
+                if t1 >= t2:
+                    r = 1
+                else:
+                    r = 0
+            elif tree.children[1] == ">":
+                if t1 > t2:
+                    r = 1
+                else:
+                    r = 0
+            elif tree.children[1] == "==":
+                if t1 == t2:
+                    r = 1
+                else:
+                    r = 0
+            elif tree.children[1] == "!=":
+                if t1 != t2:
+                    r = 1
+                else:
+                    r = 0
+        else:
+            r = self.visit(tree.children[0])
+        
+        return r
+
+    def expcond(self,tree):
+        if len(tree.children) > 1:
+            t1 = self.visit(tree.children[0])
+            t2 = self.visit(tree.children[2])
+            if(tree.children[1] == "+"):
+                r = t1 + t2
+            elif(tree.children[1] == "-"):
+                r = t1 - t2
+        else:
+            r = self.visit(tree.children[0])
+        return r
+
+    def termocond(self,tree):
+        if len(tree.children) > 1:
+            t1 = self.visit(tree.children[0])
+            t2 = self.visit(tree.children[2])
+            if(tree.children[1] == "*"):
+                r = t1 * t2
+            elif(tree.children[1] == "/"):
+                r = int(t1 / t2)
+            elif(tree.children[1] == "%"):
+                r = t1 % t2
+        else:
+            r = self.visit(tree.children[0])
+
+        return r
+
+    def factor(self,tree):
+        r = None
+        if tree.children[0].type == 'SIGNED_INT':
+            r = int(tree.children[0])
+        elif tree.children[0].type == 'VARNAME':
+            if str(tree.children[0]) not in self.atomic_vars.keys():
+                self.errors.add("Undeclared variable \"" + str(tree.children[0]) + "\"")
+                self.correct = False
+                r = -1
+            elif self.atomic_vars[str(tree.children[0])][1] == None:
+                self.errors.add("Variable \"" + str(tree.children[0]) + "\" was never initialized")
+                self.correct = False
+                r = -1
+            else:
+                r = self.atomic_vars[str(tree.children[0])][1]
+                typeV = self.atomic_vars[str(tree.children[0])][0]
+                self.atomic_vars[str(tree.children[0])] = tuple([typeV,r,0,1])
+                print("DEBUG " + str(tree.children[0]))
+        elif tree.children[0] == "(":
+            r = self.visit(tree.children[1])
+        return r
 
 grammar = '''
 start: BEGIN program END
 program: instruction+
-instruction: declaration | comment
+instruction: declaration | comment | operation
 declaration: atomic | structure
+operation: atrib | print | read | cond | cicle
+print: "print" PE (VARNAME | ESCAPED_STRING) PD PV
+read: "read" PE VARNAME PD PV
+cond: IF PE op PD body (ELSE body)?
+cicle: ciclewhile | ciclefor | ciclerepeat
+ciclewhile: WHILE PE op PD body
+WHILE: "while"
+ciclefor: FOR PE (initcicle (VIR initcicle)*)? PV op PV (inc | dec (VIR (inc | dec))*)? PD body
+initcicle: VARNAME EQUAL op
+FOR: "for"
+ciclerepeat: REPEAT PE (SIGNED_INT | VARNAME) PD body
+REPEAT: "repeat"
+body: open program close
+atrib: VARNAME EQUAL op PV
+inc: VARNAME INC
+INC: "++"
+dec: VARNAME DEC
+DEC: "--"
+op: NOT op | op (AND | OR) factcond | factcond
+NOT: "!"
+AND: "&"
+OR: "#"
+factcond: factcond BINSREL expcond | expcond
+BINSREL: LESSEQ | LESS | MOREEQ | MORE | EQ | DIFF
+LESSEQ: "<="
+LESS: "<"
+MOREEQ: ">="
+MORE: ">"
+EQ: "=="
+DIFF: "!="
+expcond: expcond (PLUS | MINUS) termocond | termocond
+PLUS: "+"
+MINUS: "-"
+termocond: termocond (MUL|DIV|MOD) factor | factor
+MUL: "*"
+DIV: "/"
+MOD: "%"
+factor: PE op PD | SIGNED_INT | VARNAME | DECIMAL
 atomic: TYPEATOMIC VARNAME (EQUAL elem)? PV
 structure: (set | list | dict | tuple) PV
 set: "set" VARNAME (EQUAL OPENBRACKET (elem (VIR elem)*)? CLOSEBRACKET)?
@@ -217,6 +473,12 @@ DD: ":"
 PE: "("
 PD: ")"
 EQUAL: "="
+open: OPEN
+OPEN: "{"
+close: CLOSE
+CLOSE: "}"
+IF: "if"
+ELSE: "else"
 
 
 %import common.WORD
@@ -254,8 +516,45 @@ tuple o = (1,"ola", 3.2);
 dict p;
 dict q = {};
 dict r = {1:"ola", 3.2:"mundo"};
-int a;
+
+for(a = 0; a < 20; a++){
+print("oi");
+}
+repeat(5){
+    print("ola");
+}
+
+if(a == 0){
+    if(c == 3){
+        print("olaMundo");
+        for(a = 3; a == 3; a++){
+            print("reset");
+            if(c != 3){
+                print("0");
+            }
+        }
+    }
+}
+if(a == 1){
+    print("kek");
+}
 }-
 '''
 parse_tree = parserLark.parse(example)
 data = MyInterpreter().visit(parse_tree)
+for i in data.items():
+    print(i)
+
+def geraHTML(atomic_vars, struct_vars):
+    print("WARNINGS => ")
+    for var in atomic_vars.keys():
+        if atomic_vars[var][2] == 0 and atomic_vars[var][3] == 0:
+            print("Variable \"" + var + "\" was never used nor initialized.")
+        elif atomic_vars[var][2] == 1 and atomic_vars[var][3] == 0:
+            print("Variable \"" + var + "\" was never used.")
+
+    for var in struct_vars.keys():
+        if struct_vars[var][3] == 0:
+            print("Variable \"" + var + "\" was never used.")
+            
+#geraHTML(data["atomic_vars"],data["struct_vars"])
