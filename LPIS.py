@@ -554,7 +554,8 @@ def geraHTMLVars(atomic_vars, struct_vars, output_html):
     output_html.write("</head>")
 
     output_html.write("<body>")
-    output_html.write("<table class=\"w3-table\ w3-striped\">")
+    output_html.write("<h1> Tabela com todas as variáveis do programa </h1>")
+    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
     output_html.write("<tr>")
     output_html.write("<th>Variável</th>")
     output_html.write("<th>Tipo</th>")
