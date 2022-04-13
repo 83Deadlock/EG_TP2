@@ -1,4 +1,5 @@
 from mimetypes import init
+from black import out
 from lark import Discard
 from lark import Lark,Token,Tree
 from lark.tree import pydot__tree_to_png
@@ -542,19 +543,52 @@ if(a == 1){
 '''
 parse_tree = parserLark.parse(example)
 data = MyInterpreter().visit(parse_tree)
-for i in data.items():
-    print(i)
 
-def geraHTML(atomic_vars, struct_vars):
-    print("WARNINGS => ")
+def geraHTMLVars(atomic_vars, struct_vars, output_html):
+    output_html.write("<!DOCTYPE html>")
+    output_html.write("<html lang=\"pt\">")
+    output_html.write("<head>")
+    output_html.write("<meta charset=\"UTF-8\">")
+    output_html.write("<link rel=\"stylesheet\" href=\"https://www.w3schools.com/w3css/4/w3.css\">")
+    output_html.write("<title>EG - TP2</title>")
+    output_html.write("</head>")
+
+    output_html.write("<body>")
+    output_html.write("<table class=\"w3-table\ w3-striped\">")
+    output_html.write("<tr>")
+    output_html.write("<th>Variável</th>")
+    output_html.write("<th>Tipo</th>")
+    output_html.write("<th>Valor</th>")
+    output_html.write("<th>Tamanho</th>")
+    output_html.write("<th>Warnings</th>")
+    output_html.write("</tr>")
+
     for var in atomic_vars.keys():
+        output_html.write("<tr>")
+        output_html.write("<td>" + var + "</td>")
+        output_html.write("<td>" + str(atomic_vars[var][0]) + "</td>")
+        output_html.write("<td>" + str(atomic_vars[var][1]) + "</td>")
+        output_html.write("<td>" + "Atomic" + "</td>")
         if atomic_vars[var][2] == 0 and atomic_vars[var][3] == 0:
-            print("Variable \"" + var + "\" was never used nor initialized.")
+            output_html.write("<td>" + "Variable \"" + var + "\" was never used nor initialized." + "</td>")
         elif atomic_vars[var][2] == 1 and atomic_vars[var][3] == 0:
-            print("Variable \"" + var + "\" was never used.")
+            output_html.write("<td>" + "Variable \"" + var + "\" was never used." + "</td>")
+        else:
+            output_html.write("<td>" + ":)" + "</td>")
+        output_html.write("</tr>")
 
     for var in struct_vars.keys():
+        output_html.write("<tr>")
+        output_html.write("<td>" + var + "</td>")
+        output_html.write("<td>" + str(struct_vars[var][0]) + "</td>")
+        output_html.write("<td>" + "Struct Var" + "</td>")
+        output_html.write("<td>" + str(struct_vars[var][1]) + "</td>")
         if struct_vars[var][3] == 0:
-            print("Variable \"" + var + "\" was never used.")
-            
-#geraHTML(data["atomic_vars"],data["struct_vars"])
+            output_html.write("<td>" + "Variable \"" + var + "\" was never used." + "</td>")
+        output_html.write("</tr>")
+    output_html.write("</table>")
+    output_html.write("</body>")
+    output_html.write("</html>")
+
+output_html = open("output.html", "w")
+geraHTMLVars(data["atomic_vars"],data["struct_vars"], output_html)
