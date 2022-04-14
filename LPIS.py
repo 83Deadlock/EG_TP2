@@ -1,10 +1,8 @@
 from mimetypes import init
-from black import out
 from lark import Discard
 from lark import Lark,Token,Tree
 from lark.tree import pydot__tree_to_png
 from lark.visitors import Interpreter
-from numpy import append, size
 
 class MyInterpreter (Interpreter):
     def __init__(self):
@@ -16,6 +14,7 @@ class MyInterpreter (Interpreter):
         self.if_count = 0
         self.if_depth = {}
         self.nivel_if = 0
+        self.instructions = {}
 
         self.atomic_vars = dict()
         # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
@@ -64,6 +63,7 @@ class MyInterpreter (Interpreter):
         self.output["if_count"] = self.if_count
         self.output["if_depth"] = self.if_depth
         self.output["nrStructs"] = self.nrStructs
+        self.output["instructions"] = self.instructions
 
         return self.output
 
@@ -91,6 +91,12 @@ class MyInterpreter (Interpreter):
         pass
 
     def atomic(self, tree):
+        if "atomic_declaration" not in self.instructions.keys():
+            self.instructions["atomic_declaration"] = 1
+        else:
+            self.instructions["atomic_declaration"] += 1
+
+
         #print("ATOMIC")
         var_type = tree.children[0].value
         #print("type => " + var_type)
@@ -130,6 +136,10 @@ class MyInterpreter (Interpreter):
             return int(tree.children[0].value)
 
     def structure(self, tree):
+        if "structure_declaration" not in self.instructions.keys():
+            self.instructions["structure_declaration"] = 1
+        else:
+            self.instructions["structure_declaration"] += 1
         self.visit(tree.children[0])
         pass
  
@@ -211,6 +221,12 @@ class MyInterpreter (Interpreter):
         self.struct_vars[tree.children[0].value] = ("dict", sizeD, ret, 0)
 
     def atrib(self,tree):
+
+        if "atrib" not in self.instructions.keys():
+            self.instructions["atrib"] = 1
+        else:
+            self.instructions["atrib"] += 1
+
         if str(tree.children[0]) not in self.errors.keys():
                 self.errors[str(tree.children[1])] = []
         if str(tree.children[0]) not in self.atomic_vars.keys():
@@ -224,6 +240,11 @@ class MyInterpreter (Interpreter):
         pass
 
     def initcicle(self, tree):
+        if "atrib" not in self.instructions.keys():
+            self.instructions["atrib"] = 1
+        else:
+            self.instructions["atrib"] += 1
+
         if str(tree.children[0]) not in self.errors.keys():
                 self.errors[str(tree.children[0])] = []
         if str(tree.children[0]) not in self.atomic_vars.keys():
@@ -235,6 +256,12 @@ class MyInterpreter (Interpreter):
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
 
     def print(self,tree):
+        if "print" not in self.instructions.keys():
+            self.instructions["print"] = 1
+        else:
+            self.instructions["print"] += 1
+
+
         if tree.children[1].type == "VARNAME":
             if str(tree.children[1]) not in self.errors.keys():
                 self.errors[str(tree.children[1])] = []
@@ -254,7 +281,33 @@ class MyInterpreter (Interpreter):
             
         pass
 
+    def read(self,tree):
+        if "read" not in self.instructions.keys():
+            self.instructions["read"] = 1
+        else:
+            self.instructions["read"] += 1
+
+        if str(tree.children[1]) not in self.errors.keys():
+            self.errors[str(tree.children[1])] = []
+
+        if str(tree.children[1]) not in self.atomic_vars.keys():
+            if str(tree.children[1]) in self.struct_vars.keys():
+                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" cannot be defined by user input.")
+            else:
+                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" was not declared")
+            self.correct = False
+        
+        else:
+            self.atomic_vars[tree.children[1]][1] = input("> ")
+
+        
+
     def cond(self,tree):
+        if "if" not in self.instructions.keys():
+            self.instructions["if"] = 1
+        else:
+            self.instructions["if"] += 1
+
         self.if_count += 1
         self.if_depth[self.if_count] = self.nivel_if
         l = len(tree.children)
@@ -270,6 +323,11 @@ class MyInterpreter (Interpreter):
         pass
 
     def ciclewhile(self,tree):
+        if "while" not in self.instructions.keys():
+            self.instructions["while"] = 1
+        else:
+            self.instructions["while"] += 1
+
         aux = self.nivel_if 
         self.nivel_if = 0
         self.inCicle = True
@@ -279,6 +337,11 @@ class MyInterpreter (Interpreter):
         pass
 
     def ciclefor(self,tree):
+        if "for" not in self.instructions.keys():
+            self.instructions["for"] = 1
+        else:
+            self.instructions["for"] += 1
+
         aux = self.nivel_if 
         self.nivel_if = 0
         self.inCicle = True
@@ -296,11 +359,18 @@ class MyInterpreter (Interpreter):
         pass
 
     def dec(self, tree):
+
+
         typeV = self.atomic_vars[str(tree.children[0])][0]
         valueV = self.atomic_vars[str(tree.children[0])][1] - 1
         self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
 
     def ciclerepeat(self,tree):
+        if "repeat" not in self.instructions.keys():
+            self.instructions["repeat"] = 1
+        else:
+            self.instructions["repeat"] += 1
+
         #print(tree.pretty())
         aux = self.nivel_if 
         self.nivel_if = 0
@@ -654,3 +724,5 @@ output_html = open("output.html", "w")
 #1 e 2 e 3
 geraHTMLVars(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
 data["nrInstrucoes"] ,output_html)
+
+print(data["instructions"])
