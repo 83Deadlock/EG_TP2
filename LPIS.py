@@ -658,8 +658,8 @@ def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instruco
 
     output_html.write("<body>")
     output_html.write("<h1> Tabela com todas as variáveis atómicas do programa </h1>")
-    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
-    output_html.write("<tr>")
+    output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
+    output_html.write("<tr class=\"w3-yellow\">")
     output_html.write("<th>Variável</th>")
     output_html.write("<th>Tipo</th>")
     output_html.write("<th>Valor</th>")
@@ -682,8 +682,8 @@ def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instruco
     output_html.write("</table>")
 
     output_html.write("<h1> Tabela com todas as estruturas do programa </h1>")
-    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
-    output_html.write("<tr>")
+    output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
+    output_html.write("<tr class=\"w3-yellow\">")
     output_html.write("<th>Variável</th>")
     output_html.write("<th>Tipo</th>")
     output_html.write("<th>Tamanho</th>")
@@ -708,8 +708,8 @@ def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instruco
     output_html.write("<h1> Total de variáveis do programa: " + str(len(atomic_vars.keys()) + len(struct_vars.keys())) + "</h1>")
 
     output_html.write("<h1> Tipos de dados estruturados usados </h1>")
-    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
-    output_html.write("<tr>")
+    output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
+    output_html.write("<tr class=\"w3-yellow\">")
     output_html.write("<th>Tipo</th>")
     output_html.write("<th>Número</th>")
     output_html.write("</tr>")
@@ -723,8 +723,8 @@ def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instruco
     output_html.write("</table>")
 
     output_html.write("<h1> Número total de instruções </h1>")
-    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
-    output_html.write("<tr>")
+    output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
+    output_html.write("<tr class=\"w3-yellow\">")
     output_html.write("<th>Instrução</th>")
     output_html.write("<th>Número</th>")
     output_html.write("</tr>")
