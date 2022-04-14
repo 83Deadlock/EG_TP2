@@ -117,10 +117,14 @@ class MyInterpreter (Interpreter):
         init = 0
         used = 0
 
-        if(size(tree.children) > 3):
+        if(len(tree.children) > 3):
             var_value = self.visit(tree.children[3])
             init = 1
             #print("value => " + str(var_value))
+            if "atrib" not in self.instructions.keys():
+                self.instructions["atrib"] = 1
+            else:
+                self.instructions["atrib"] += 1
 
         val = (var_type,var_value,init,used)
         self.atomic_vars[var_name] = val
@@ -145,7 +149,7 @@ class MyInterpreter (Interpreter):
  
     def set(self, tree):
         ret = set()
-        childs = size(tree.children)
+        childs = len(tree.children)
         sizeS = 0
         if(childs == 1):
             print("Set \"" + tree.children[0] + "\" => " + str(ret))
@@ -164,7 +168,7 @@ class MyInterpreter (Interpreter):
 
     def list(self, tree):
         ret = list()
-        childs = size(tree.children)
+        childs = len(tree.children)
         sizeL = 0
         if(childs == 1):
             print("List \"" + tree.children[0] + "\" => " + str(ret))
@@ -185,7 +189,7 @@ class MyInterpreter (Interpreter):
         aux = list()
         ret = tuple()
         sizeT = 0
-        childs = size(tree.children)
+        childs = len(tree.children)
         if(childs == 1):
             print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
 
@@ -204,7 +208,7 @@ class MyInterpreter (Interpreter):
 
     def dict(self, tree):
         ret = dict()
-        childs = size(tree.children)
+        childs = len(tree.children)
         sizeD = 0
         if(childs == 1):
             print("Dict \"" + tree.children[0] + "\" => " + str(ret))
@@ -723,6 +727,6 @@ output_html = open("output.html", "w")
 
 #1 e 2 e 3
 geraHTMLVars(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
-data["nrInstrucoes"] ,output_html)
+data["instructions"] ,output_html)
 
 print(data["instructions"])
