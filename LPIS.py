@@ -647,7 +647,7 @@ if(a == 1){
 parse_tree = parserLark.parse(example)
 data = MyInterpreter().visit(parse_tree)
 
-def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, nrInstrucoes, output_html):
+def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, output_html):
     output_html.write("<!DOCTYPE html>")
     output_html.write("<html lang=\"pt\">")
     output_html.write("<head>")
@@ -720,6 +720,28 @@ def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, nrInstru
         output_html.write("<td>" + str(nrStructs[type]) + "</td>")
         output_html.write("</tr>")
 
+    output_html.write("</table>")
+
+    output_html.write("<h1> Número total de instruções </h1>")
+    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
+    output_html.write("<tr>")
+    output_html.write("<th>Instrução</th>")
+    output_html.write("<th>Número</th>")
+    output_html.write("</tr>")
+
+    total = 0
+
+    for instrucao in instrucoes.keys():
+        output_html.write("<tr>")
+        output_html.write("<td>" + instrucao + "</td>")
+        output_html.write("<td>" + str(instrucoes[instrucao]) + "</td>")
+        output_html.write("</tr>")
+        total += instrucoes[instrucao]
+
+    output_html.write("<td>Total</td>")
+    output_html.write("<td>" + str(total) + "</td>")
+    output_html.write("</table>")
+
     output_html.write("</body>")
     output_html.write("</html>")
 
@@ -728,5 +750,3 @@ output_html = open("output.html", "w")
 #1 e 2 e 3
 geraHTMLVars(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
 data["instructions"] ,output_html)
-
-print(data["instructions"])
