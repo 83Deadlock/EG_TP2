@@ -4,13 +4,13 @@ from lark import Discard
 from lark import Lark,Token,Tree
 from lark.tree import pydot__tree_to_png
 from lark.visitors import Interpreter
-from numpy import size
+from numpy import append, size
 
 class MyInterpreter (Interpreter):
     def __init__(self):
         self.output = {}
-        self.warnings = set()
-        self.errors = set()
+        self.warnings = {}
+        self.errors = {}
         self.correct = True
         self.inCicle = False
         self.if_count = 0
@@ -21,7 +21,9 @@ class MyInterpreter (Interpreter):
         # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
 
         self.struct_vars = dict()
-        # STRUCT_VARS = {VARNAME : (TYPE,SIZE,USED?)}
+        # STRUCT_VARS = {VARNAME : (TYPE,SIZE,VALUE,USED?)}
+
+        self.nrStructs = dict()
 
         self.TAG = "-=ANALYZER=-"
 
@@ -31,13 +33,27 @@ class MyInterpreter (Interpreter):
         print(self.TAG + "\n\tFINISH")
         
         for var in self.atomic_vars.keys():
+            if var not in self.warnings.keys():
+                    self.warnings[var] = []
+
             if self.atomic_vars[var][2] == 0 and self.atomic_vars[var][3] == 0:
-                self.warnings.add("Variable \"" + var + "\" was never used nor initialized.")
+                self.warnings[var].append("Variable \"" + var + "\" was never initialized nor used.")
+
             elif self.atomic_vars[var][2] == 1 and self.atomic_vars[var][3] == 0:
-                self.warnings.add("Variable \"" + var + "\" was never used.")
+                self.warnings[var].append("Variable \"" + var + "\" was never used.")
+
         for var in self.struct_vars.keys():
+            if var not in self.warnings.keys():
+                    self.warnings[var] = []
+
+            if self.struct_vars[var][0] not in self.nrStructs.keys():
+                self.nrStructs[self.struct_vars[var][0]] = 1
+            
+            else:
+                self.nrStructs[self.struct_vars[var][0]] += 1
+
             if self.struct_vars[var][3] == 0:
-                self.warnings.add("Variable \"" + var + "\" was never used.")
+                self.warnings[var].append("Variable \"" + var + "\" was never used.")
 
 
         self.output["atomic_vars"] = self.atomic_vars
@@ -47,6 +63,7 @@ class MyInterpreter (Interpreter):
         self.output["warnings"] = self.warnings
         self.output["if_count"] = self.if_count
         self.output["if_depth"] = self.if_depth
+        self.output["nrStructs"] = self.nrStructs
 
         return self.output
 
@@ -82,9 +99,12 @@ class MyInterpreter (Interpreter):
         var_name = tree.children[1].value
         #print("name => " + var_name)
 
+        if var_name not in self.errors.keys():
+            self.errors[var_name] = []
+
         if(var_name in self.atomic_vars.keys() or var_name in self.struct_vars.keys()):
             self.correct = False
-            self.errors.add("Variable \"" + var_name + "\" declared more than once!")
+            self.errors[var_name].append("Variable \"" + var_name + "\" declared more than once!")
             return
 
         var_value = None
@@ -191,8 +211,10 @@ class MyInterpreter (Interpreter):
         self.struct_vars[tree.children[0].value] = ("dict", sizeD, ret, 0)
 
     def atrib(self,tree):
+        if str(tree.children[0]) not in self.errors.keys():
+                self.errors[str(tree.children[1])] = []
         if str(tree.children[0]) not in self.atomic_vars.keys():
-            self.errors.add("Variable \"" + tree.children[0] + "\" was not declared")
+            self.errors[str(tree.children[0])].append("Variable \"" + tree.children[0] + "\" was not declared")
             self.correct = False
         else:
             typeV = self.atomic_vars[str(tree.children[0])][0]
@@ -202,8 +224,10 @@ class MyInterpreter (Interpreter):
         pass
 
     def initcicle(self, tree):
+        if str(tree.children[0]) not in self.errors.keys():
+                self.errors[str(tree.children[0])] = []
         if str(tree.children[0]) not in self.atomic_vars.keys():
-            self.errors.add("Variable \"" + tree.children[0] + "\" was not declared")
+            self.errors[str(tree.children[0])].append("Variable \"" + tree.children[0] + "\" was not declared")
             self.correct = False
         else:
             typeV = self.atomic_vars[tree.children[0]][0]
@@ -212,11 +236,13 @@ class MyInterpreter (Interpreter):
 
     def print(self,tree):
         if tree.children[1].type == "VARNAME":
+            if str(tree.children[1]) not in self.errors.keys():
+                self.errors[str(tree.children[1])] = []
             if str(tree.children[1]) not in self.atomic_vars.keys():
-                self.errors.add("Variable \"" + tree.children[1] + "\" was not declared")
+                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" was not declared")
                 self.correct = False
             elif not self.atomic_vars[str(tree.children[1])][2]:
-                self.errors.add("Variable \"" + tree.children[1] + "\" declared but not initialized")
+                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" declared but not initialized")
                 self.correct = False
             else:
                 print("> " + str(self.atomic_vars[tree.children[1]][1]))
@@ -392,12 +418,15 @@ class MyInterpreter (Interpreter):
         if tree.children[0].type == 'SIGNED_INT':
             r = int(tree.children[0])
         elif tree.children[0].type == 'VARNAME':
+            if str(tree.children[0]) not in self.errors.keys():
+                self.erros[str(tree.children[0])] = []
+
             if str(tree.children[0]) not in self.atomic_vars.keys():
-                self.errors.add("Undeclared variable \"" + str(tree.children[0]) + "\"")
+                self.errors[str(tree.children[0])].append("Undeclared variable \"" + str(tree.children[0]) + "\"")
                 self.correct = False
                 r = -1
             elif self.atomic_vars[str(tree.children[0])][1] == None:
-                self.errors.add("Variable \"" + str(tree.children[0]) + "\" was never initialized")
+                self.errors[str(tree.children[0])].append("Variable \"" + str(tree.children[0]) + "\" was never initialized")
                 self.correct = False
                 r = -1
             else:
@@ -544,7 +573,7 @@ if(a == 1){
 parse_tree = parserLark.parse(example)
 data = MyInterpreter().visit(parse_tree)
 
-def geraHTMLVars(atomic_vars, struct_vars, output_html):
+def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, nrInstrucoes, output_html):
     output_html.write("<!DOCTYPE html>")
     output_html.write("<html lang=\"pt\">")
     output_html.write("<head>")
@@ -554,14 +583,14 @@ def geraHTMLVars(atomic_vars, struct_vars, output_html):
     output_html.write("</head>")
 
     output_html.write("<body>")
-    output_html.write("<h1> Tabela com todas as variáveis do programa </h1>")
+    output_html.write("<h1> Tabela com todas as variáveis atómicas do programa </h1>")
     output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
     output_html.write("<tr>")
     output_html.write("<th>Variável</th>")
     output_html.write("<th>Tipo</th>")
     output_html.write("<th>Valor</th>")
-    output_html.write("<th>Tamanho</th>")
     output_html.write("<th>Warnings</th>")
+    output_html.write("<th>Erros</th>")
     output_html.write("</tr>")
 
     for var in atomic_vars.keys():
@@ -569,27 +598,59 @@ def geraHTMLVars(atomic_vars, struct_vars, output_html):
         output_html.write("<td>" + var + "</td>")
         output_html.write("<td>" + str(atomic_vars[var][0]) + "</td>")
         output_html.write("<td>" + str(atomic_vars[var][1]) + "</td>")
-        output_html.write("<td>" + "Atomic" + "</td>")
-        if atomic_vars[var][2] == 0 and atomic_vars[var][3] == 0:
-            output_html.write("<td>" + "Variable \"" + var + "\" was never used nor initialized." + "</td>")
-        elif atomic_vars[var][2] == 1 and atomic_vars[var][3] == 0:
-            output_html.write("<td>" + "Variable \"" + var + "\" was never used." + "</td>")
-        else:
-            output_html.write("<td>" + ":)" + "</td>")
+        if var in warnings.keys():
+            output_html.write("<td>" + str(warnings[var]) + "</td>")
+        
+        if var in errors.keys():
+            output_html.write("<td>" + str(errors[var]) + "</td>")
+          
         output_html.write("</tr>")
+    output_html.write("</table>")
+
+    output_html.write("<h1> Tabela com todas as estruturas do programa </h1>")
+    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
+    output_html.write("<tr>")
+    output_html.write("<th>Variável</th>")
+    output_html.write("<th>Tipo</th>")
+    output_html.write("<th>Tamanho</th>")
+    output_html.write("<th>Valor</th>")
+    output_html.write("<th>Warnings</th>")
+    output_html.write("</tr>")
 
     for var in struct_vars.keys():
         output_html.write("<tr>")
         output_html.write("<td>" + var + "</td>")
         output_html.write("<td>" + str(struct_vars[var][0]) + "</td>")
-        output_html.write("<td>" + "Struct Var" + "</td>")
         output_html.write("<td>" + str(struct_vars[var][1]) + "</td>")
-        if struct_vars[var][3] == 0:
-            output_html.write("<td>" + "Variable \"" + var + "\" was never used." + "</td>")
+        output_html.write("<td>" + str(struct_vars[var][2]) + "</td>")
+
+        if var in warnings.keys():
+            output_html.write("<td>" + str(warnings[var]) + "</td>")
+
         output_html.write("</tr>")
+
     output_html.write("</table>")
+
+    output_html.write("<h1> Total de variáveis do programa: " + str(len(atomic_vars.keys()) + len(struct_vars.keys())) + "</h1>")
+
+    output_html.write("<h1> Tipos de dados estruturados usados </h1>")
+    output_html.write("<table class=\"w3-table\ w3-striped w3-centered\">")
+    output_html.write("<tr>")
+    output_html.write("<th>Tipo</th>")
+    output_html.write("<th>Número</th>")
+    output_html.write("</tr>")
+
+    for type in nrStructs.keys():
+        output_html.write("<tr>")
+        output_html.write("<td>" + type + "</td>")
+        output_html.write("<td>" + str(nrStructs[type]) + "</td>")
+        output_html.write("</tr>")
+
     output_html.write("</body>")
     output_html.write("</html>")
 
 output_html = open("output.html", "w")
-geraHTMLVars(data["atomic_vars"],data["struct_vars"], output_html)
+
+#1 e 2 e 3
+geraHTMLVars(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
+data["nrInstrucoes"] ,output_html)
