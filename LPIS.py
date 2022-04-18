@@ -1,3 +1,4 @@
+from dataclasses import InitVar
 from mimetypes import init
 from lark import Discard
 from lark import Lark,Token,Tree
@@ -18,6 +19,9 @@ class MyInterpreter (Interpreter):
         self.controlID = 0
         self.controlStructs = {}
 
+        self.if_parts = {}
+        self.code = ""
+
         self.atomic_vars = dict()
         # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
 
@@ -30,7 +34,9 @@ class MyInterpreter (Interpreter):
 
     def start(self,tree):
         print(self.TAG + "\n\tSTART")
+        self.code += "-{\n"
         self.visit(tree.children[1])
+        self.code += "}-\n"
         print(self.TAG + "\n\tFINISH")
         
         for var in self.atomic_vars.keys():
@@ -67,6 +73,8 @@ class MyInterpreter (Interpreter):
         self.output["nrStructs"] = self.nrStructs
         self.output["instructions"] = self.instructions
         self.output["controlStructs"] = self.controlStructs
+        self.output["if_parts"] = self.if_parts
+        self.output["code"] = self.code
 
         return self.output
 
@@ -83,6 +91,7 @@ class MyInterpreter (Interpreter):
 
     def comment(self, tree):
         comment = tree.children[0].value
+        self.code += comment + "\n"
         #print("\t-=AUTHOR'S COMMENT=-\n\t\t" + comment[2:(len(comment)-2)])
 
         pass
@@ -110,36 +119,52 @@ class MyInterpreter (Interpreter):
             self.errors[var_name].add("Variable \"" + var_name + "\" declared more than once!")
             return
 
+        self.code += var_type + " " + var_name
+
         var_value = None
         init = 0
         used = 0
 
         if(len(tree.children) > 3):
+            self.code += " = " 
             var_value = self.visit(tree.children[3])
+            print("RETORNA => " + str(var_value))
             init = 1
             if "atrib" not in self.instructions.keys():
                 self.instructions["atrib"] = 1
             else:
                 self.instructions["atrib"] += 1
 
+
         val = (var_type,var_value,init,used)
         self.atomic_vars[var_name] = val
+
+        self.code += ";\n"
 
         pass
 
     def elem(self, tree):
-        if(tree.children[0].type == "ESCAPED_STRING"):
-            return str(tree.children[0].value[1:(len(tree.children[0].value)-1)])
-        elif(tree.children[0].type == "DECIMAL"):
-            return float(tree.children[0].value)
-        elif(tree.children[0].type == "SIGNED_INT"):
-            return int(tree.children[0].value)
+
+        if(not isinstance(tree.children[0], Tree)):
+            if(tree.children[0].type == "ESCAPED_STRING"):
+                self.code += str(tree.children[0])
+                return str(tree.children[0].value[1:(len(tree.children[0].value)-1)])
+            elif(tree.children[0].type == "DECIMAL"):
+                self.code += str(tree.children[0])
+                return float(tree.children[0].value)
+            elif(tree.children[0].type == "SIGNED_INT"):
+                self.code += str(tree.children[0])
+                return int(tree.children[0].value)
+        else:
+            r = self.visit(tree.children[0])
+            return r
 
     def structure(self, tree):
         if "structure_declaration" not in self.instructions.keys():
             self.instructions["structure_declaration"] = 1
         else:
             self.instructions["structure_declaration"] += 1
+
         self.visit(tree.children[0])
 
         pass
@@ -148,14 +173,24 @@ class MyInterpreter (Interpreter):
         ret = set()
         childs = len(tree.children)
         sizeS = 0
+        self.code += "set " + tree.children[0].value
+        print(tree.pretty())
         if childs != 1 and childs != 4:
-            for c in tree.children[2:childs-1]:
+            self.code += " = "
+            for c in tree.children[2:]:
                 if c != "{" and c != "}" and c != ",":
                     ret.add(self.visit(c))
+                if c == "{" or c == "}" or c == ",":
+                    self.code += c.value
+                    if c == ",":
+                        self.code += " "
             #print("Set \"" + tree.children[0] + "\" => " + str(ret))
-            sizeS = len(ret)
-        
+            sizeS = len(ret)            
+        elif childs == 4:
+            self.code += " = {}"
+        self.code += ";\n"
         self.struct_vars[tree.children[0].value] = ("set", sizeS, ret, 0)
+
 
         pass
 
@@ -163,13 +198,22 @@ class MyInterpreter (Interpreter):
         ret = list()
         childs = len(tree.children)
         sizeL = 0
+        self.code += "list " + tree.children[0].value
         if childs != 1 and childs != 4:
-        
-            for c in tree.children[2:childs-1]:
+            self.code += " = "
+            for c in tree.children[2:]:
                 if c != "[" and c != "]" and c != ",":
                     ret.append(self.visit(c))
+                if c == "[" or c == "]" or c == ",":
+                    self.code += c.value
+                    if c == ",":
+                        self.code += " "
             #print("List \"" + tree.children[0] + "\" => " + str(ret))
             sizeL = len(ret)
+        elif childs == 4:
+            self.code += " = []"
+
+        self.code += ";\n"
 
         self.struct_vars[tree.children[0].value] = ("list", sizeL, ret, 0)
 
@@ -180,13 +224,23 @@ class MyInterpreter (Interpreter):
         ret = tuple()
         sizeT = 0
         childs = len(tree.children)
+        self.code += "tuple " + tree.children[0].value
         if childs != 1 and childs != 4:
-            for c in tree.children[2:childs-1]:
+            self.code += " = "
+            for c in tree.children[2:]:
                 if c != "(" and c != ")" and c != ",":
                     aux.append(self.visit(c))
+                if c == "(" or c == ")" or c == ",":
+                    self.code += c.value
+                    if c == ",":
+                        self.code += " "
             ret = tuple(aux)
             #print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
             sizeT = len(ret)
+        elif childs == 4:
+            self.code += " = ()"
+
+        self.code += ";\n"
 
         self.struct_vars[tree.children[0].value] = ("tuple", sizeT, ret, 0)
 
@@ -196,14 +250,26 @@ class MyInterpreter (Interpreter):
         ret = dict()
         childs = len(tree.children)
         sizeD = 0
+        self.code += "dict " + tree.children[0].value
 
         if childs != 1 and childs != 4:
+            self.code += " = {"
             start = 3
             while start < childs-1:
-                ret[self.visit(tree.children[start])] = self.visit(tree.children[start+2]) 
+                key = self.visit(tree.children[start])
+                self.code += " : "
+                value = self.visit(tree.children[start+2])
+                if start + 4 < (childs-1):
+                    self.code += ", "
+                ret[key] = value 
                 start += 4
             #print("Dict \"" + tree.children[0] + "\" => " + str(ret))
+            self.code += "}"
             sizeD = len(ret)
+        elif childs == 4:
+            self.code += " = {}"
+
+        self.code += ";\n"
         
         self.struct_vars[tree.children[0].value] = ("dict", sizeD, ret, 0)
 
@@ -215,6 +281,10 @@ class MyInterpreter (Interpreter):
             self.instructions["atrib"] = 1
         else:
             self.instructions["atrib"] += 1
+
+        self.code += tree.children[0].value + " = "
+        valueV = self.visit(tree.children[2])
+        self.code += ";\n"
 
         if str(tree.children[0]) not in self.errors.keys():
             self.errors[str(tree.children[0])] = set()
@@ -228,7 +298,6 @@ class MyInterpreter (Interpreter):
 
         else:
             typeV = self.atomic_vars[str(tree.children[0])][0]
-            valueV = self.visit(tree.children[2])
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
             
         pass
@@ -239,6 +308,10 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["atrib"] += 1
 
+        self.code += tree.children[0].value + " = "
+        valueV = self.visit(tree.children[2])
+
+
         if str(tree.children[0]) not in self.errors.keys():
                 self.errors[str(tree.children[0])] = set()
         if str(tree.children[0]) not in self.atomic_vars.keys():
@@ -246,7 +319,6 @@ class MyInterpreter (Interpreter):
             self.correct = False
         else:
             typeV = self.atomic_vars[tree.children[0]][0]
-            valueV = self.visit(tree.children[2])
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
 
         pass
@@ -257,8 +329,10 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["print"] += 1
 
+        self.code += "print("
 
         if tree.children[1].type == "VARNAME":
+            self.code += tree.children[1].value
             if str(tree.children[1]) not in self.errors.keys():
                 self.errors[str(tree.children[1])] = set()
             if str(tree.children[1]) not in self.atomic_vars.keys():
@@ -271,9 +345,12 @@ class MyInterpreter (Interpreter):
                 print("> " + str(self.atomic_vars[tree.children[1]][1]))
             
         elif tree.children[1].type == "ESCAPED_STRING":
+            self.code += tree.children[1].value
             s = tree.children[1]
             s = s.replace("\"","")
             print("> " + s)
+        
+        self.code += ");\n"
             
         pass
 
@@ -282,6 +359,8 @@ class MyInterpreter (Interpreter):
             self.instructions["read"] = 1
         else:
             self.instructions["read"] += 1
+
+        self.code += "read(" + tree.children[1].value + ");\n"
 
         if str(tree.children[1]) not in self.errors.keys():
             self.errors[str(tree.children[1])] = set()
@@ -294,8 +373,12 @@ class MyInterpreter (Interpreter):
             self.correct = False
         
         else:
-            self.atomic_vars[tree.children[1]][1] = input("> ")
-
+            value = input("> ")
+            typeV = self.atomic_vars[tree.children[1]][0]
+            initV = 1
+            usedV = 1
+            val = int(value)
+            self.atomic_vars[tree.children[1]] = tuple([typeV, val, initV, usedV])
         pass
 
     def cond(self,tree):
@@ -303,6 +386,7 @@ class MyInterpreter (Interpreter):
             self.instructions["if"] = 1
         else:
             self.instructions["if"] += 1
+
 
         # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
         parents = []
@@ -319,13 +403,18 @@ class MyInterpreter (Interpreter):
         self.if_count += 1
         self.if_depth[self.if_count] = self.nivel_if
 
+        self.if_parts[self.if_count] = (tree.children[2],tree.children[4])
+
         l = len(tree.children)
 
+        self.code += "if("
         self.visit(tree.children[2])
+        self.code += ")"
 
         self.visit(tree.children[4])     
 
         if(tree.children[(l-2)] == "else"):
+            self.code += " else "
             self.visit(tree.children[(l-1)])
 
         pass
@@ -350,6 +439,12 @@ class MyInterpreter (Interpreter):
         aux = self.nivel_if 
         self.nivel_if = 0
         self.inCicle = True
+
+        self.code += "while("
+
+        self.visit(tree.children[2])
+
+        self.code += ")"
 
         self.visit(tree.children[4])
         
@@ -382,6 +477,10 @@ class MyInterpreter (Interpreter):
         for c in tree.children:
             if c != "for" and c != "(" and c != ")" and c != ";" and c != ",":
                 self.visit(c)
+            if c == "for" or c == "(" or c == ")" or c == ";" or c == ",":
+                self.code += c.value
+                if(c == ";" or c == ","):
+                    self.code += " "
         
         self.inCicle = False
         self.nivel_if = aux
@@ -389,6 +488,7 @@ class MyInterpreter (Interpreter):
         pass
 
     def inc(self, tree):
+        self.code += tree.children[0] + "++"
         typeV = self.atomic_vars[str(tree.children[0])][0]
         valueV = self.atomic_vars[str(tree.children[0])][1] + 1
         self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
@@ -396,6 +496,7 @@ class MyInterpreter (Interpreter):
         pass
 
     def dec(self, tree):
+        self.code += tree.children[0] + "--"
         typeV = self.atomic_vars[str(tree.children[0])][0]
         valueV = self.atomic_vars[str(tree.children[0])][1] - 1
         self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
@@ -423,6 +524,10 @@ class MyInterpreter (Interpreter):
         self.nivel_if = 0
         self.inCicle = True
         
+        print(tree.children)
+
+        self.code += "repeat(" + tree.children[2] + ")"
+
         self.visit(tree.children[4])
         
         self.inCicle = False
@@ -438,6 +543,7 @@ class MyInterpreter (Interpreter):
     def open(self,tree):
         if not self.inCicle:
             self.nivel_if += 1
+        self.code += "{\n"
 
         pass
 
@@ -449,17 +555,20 @@ class MyInterpreter (Interpreter):
         k = max(newDict.keys())
         self.controlStructs[k] = (self.controlStructs[k][0],0,self.controlStructs[k][2])
 
+        self.code += "}\n"
 
         pass
 
     def op(self,tree):
         if(len(tree.children) > 1):
             if(tree.children[0] == "!"):
+                self.code += "!"
                 r = int(self.visit(tree.children[1]))
                 if r == 0: r = 1
                 else: r = 0
             elif(tree.children[1] == "&"):
                 t1 = self.visit(tree.children[0])
+                self.code += " & "
                 t2 = self.visit(tree.children[2])
                 if t1 and t2:
                     r = 1
@@ -467,6 +576,7 @@ class MyInterpreter (Interpreter):
                     r = 0
             elif(tree.children[1] == "#"):
                 t1 = self.visit(tree.children[0])
+                self.code += " # "
                 t2 = self.visit(tree.children[2])
                 if t1 or t2:
                     r = 1
@@ -480,6 +590,7 @@ class MyInterpreter (Interpreter):
     def factcond(self,tree):
         if len(tree.children) > 1:
             t1 = self.visit(tree.children[0])
+            self.code += " " + tree.children[1].value + " "
             t2 = self.visit(tree.children[2])
             if tree.children[1] == "<=":
                 if t1 <= t2:
@@ -519,6 +630,7 @@ class MyInterpreter (Interpreter):
     def expcond(self,tree):
         if len(tree.children) > 1:
             t1 = self.visit(tree.children[0])
+            self.code += " " + tree.children[1].value + " "
             t2 = self.visit(tree.children[2])
             if(tree.children[1] == "+"):
                 r = t1 + t2
@@ -532,6 +644,7 @@ class MyInterpreter (Interpreter):
     def termocond(self,tree):
         if len(tree.children) > 1:
             t1 = self.visit(tree.children[0])
+            self.code += " " + tree.children[1].value + " "
             t2 = self.visit(tree.children[2])
             if(tree.children[1] == "*"):
                 r = t1 * t2
@@ -548,6 +661,7 @@ class MyInterpreter (Interpreter):
         r = None
         if tree.children[0].type == 'SIGNED_INT':
             r = int(tree.children[0])
+            self.code += str(r)
         elif tree.children[0].type == 'VARNAME':
 
             if str(tree.children[0]) not in self.errors.keys():
@@ -569,6 +683,8 @@ class MyInterpreter (Interpreter):
                 typeV = self.atomic_vars[str(tree.children[0])][0]
                 initV = self.atomic_vars[str(tree.children[0])][2]
                 self.atomic_vars[str(tree.children[0])] = tuple([typeV,r,initV,1])
+
+            self.code += tree.children[0].value
 
         elif tree.children[0] == "(":
             r = self.visit(tree.children[1])
@@ -624,7 +740,7 @@ set: "set" VARNAME (EQUAL OPENBRACKET (elem (VIR elem)*)? CLOSEBRACKET)?
 dict: "dict" VARNAME (EQUAL OPENBRACKET (elem DD elem (VIR elem DD elem)*)? CLOSEBRACKET)?
 list: "list" VARNAME (EQUAL OPENSQR (elem (VIR elem)*)? CLOSESQR)?
 tuple: "tuple" VARNAME (EQUAL PE (elem (VIR elem)*)? PD)?
-elem: ESCAPED_STRING | SIGNED_INT | DECIMAL 
+elem: ESCAPED_STRING | SIGNED_INT | DECIMAL | op
 TYPEATOMIC: "int" | "float" | "string" 
 VARNAME: WORD
 comment: C_COMMENT
@@ -661,7 +777,8 @@ parserLark = Lark(grammar)
 example = '''-{ 
 /*atoms*/
 int a;
-int b = 2;
+read(a);
+int b = 1 + 1;
 float c;
 float d = 3.4;
 string e;
@@ -687,6 +804,10 @@ dict p;
 dict q = {};
 dict r = {1:"ola", 3.2:"mundo"};
 
+while(a < 0){
+    print("while");
+}
+
 for(a = 0; a < 20; a++){
 print("oi");
 }
@@ -700,7 +821,7 @@ if(a == 0){
         for(a = 3; a == 3; a++){
             print("reset");
             if(c != 3){
-                print("0");
+                print(b);
             }
         }
     }
@@ -844,3 +965,12 @@ geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors
 data["instructions"] ,output_html, data["controlStructs"])
 
 print(data["if_depth"])
+
+## juntar if 0 a n
+
+# cond = cond_0 and cond_1 and ... and cond_n
+# visit(cond)
+# visit(body_n)
+
+with open("outTest.ntz","w") as file:
+    file.write(data["code"])
