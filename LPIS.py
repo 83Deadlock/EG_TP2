@@ -15,6 +15,8 @@ class MyInterpreter (Interpreter):
         self.if_depth = {}
         self.nivel_if = 0
         self.instructions = {}
+        self.controlID = 0
+        self.controlStructs = {}
 
         self.atomic_vars = dict()
         # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
@@ -64,6 +66,7 @@ class MyInterpreter (Interpreter):
         self.output["if_depth"] = self.if_depth
         self.output["nrStructs"] = self.nrStructs
         self.output["instructions"] = self.instructions
+        self.output["controlStructs"] = self.controlStructs
 
         return self.output
 
@@ -79,9 +82,8 @@ class MyInterpreter (Interpreter):
         pass
 
     def comment(self, tree):
-        print("\t-=AUTHOR'S COMMENT=-")
         comment = tree.children[0].value
-        print("\t\t" + comment[2:(len(comment)-2)])
+        #print("\t-=AUTHOR'S COMMENT=-\n\t\t" + comment[2:(len(comment)-2)])
 
         pass
 
@@ -96,21 +98,16 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["atomic_declaration"] += 1
 
-
-        #print("ATOMIC")
-        var_type = tree.children[0].value
-        #print("type => " + var_type)
-        
+        var_type = tree.children[0].value        
 
         var_name = tree.children[1].value
-        #print("name => " + var_name)
 
         if var_name not in self.errors.keys():
-            self.errors[var_name] = []
+            self.errors[var_name] = set()
 
         if(var_name in self.atomic_vars.keys() or var_name in self.struct_vars.keys()):
             self.correct = False
-            self.errors[var_name].append("Variable \"" + var_name + "\" declared more than once!")
+            self.errors[var_name].add("Variable \"" + var_name + "\" declared more than once!")
             return
 
         var_value = None
@@ -120,7 +117,6 @@ class MyInterpreter (Interpreter):
         if(len(tree.children) > 3):
             var_value = self.visit(tree.children[3])
             init = 1
-            #print("value => " + str(var_value))
             if "atrib" not in self.instructions.keys():
                 self.instructions["atrib"] = 1
             else:
@@ -145,84 +141,73 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["structure_declaration"] += 1
         self.visit(tree.children[0])
+
         pass
  
     def set(self, tree):
         ret = set()
         childs = len(tree.children)
         sizeS = 0
-        if(childs == 1):
-            print("Set \"" + tree.children[0] + "\" => " + str(ret))
-
-        elif(childs == 4):
-            print("Set \"" + tree.children[0] + "\" => " + str(ret))
-
-        else:
+        if childs != 1 and childs != 4:
             for c in tree.children[2:childs-1]:
                 if c != "{" and c != "}" and c != ",":
                     ret.add(self.visit(c))
-            print("Set \"" + tree.children[0] + "\" => " + str(ret))
+            #print("Set \"" + tree.children[0] + "\" => " + str(ret))
             sizeS = len(ret)
         
         self.struct_vars[tree.children[0].value] = ("set", sizeS, ret, 0)
+
+        pass
 
     def list(self, tree):
         ret = list()
         childs = len(tree.children)
         sizeL = 0
-        if(childs == 1):
-            print("List \"" + tree.children[0] + "\" => " + str(ret))
-
-        elif(childs == 4):
-            print("List \"" + tree.children[0] + "\" => " + str(ret))
-
-        else:
+        if childs != 1 and childs != 4:
+        
             for c in tree.children[2:childs-1]:
                 if c != "[" and c != "]" and c != ",":
                     ret.append(self.visit(c))
-            print("List \"" + tree.children[0] + "\" => " + str(ret))
+            #print("List \"" + tree.children[0] + "\" => " + str(ret))
             sizeL = len(ret)
 
         self.struct_vars[tree.children[0].value] = ("list", sizeL, ret, 0)
+
+        pass
 
     def tuple(self, tree):
         aux = list()
         ret = tuple()
         sizeT = 0
         childs = len(tree.children)
-        if(childs == 1):
-            print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
-
-        elif(childs == 4):
-            print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
-
-        else:
+        if childs != 1 and childs != 4:
             for c in tree.children[2:childs-1]:
                 if c != "(" and c != ")" and c != ",":
                     aux.append(self.visit(c))
             ret = tuple(aux)
-            print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
+            #print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
             sizeT = len(ret)
 
         self.struct_vars[tree.children[0].value] = ("tuple", sizeT, ret, 0)
+
+        pass
 
     def dict(self, tree):
         ret = dict()
         childs = len(tree.children)
         sizeD = 0
-        if(childs == 1):
-            print("Dict \"" + tree.children[0] + "\" => " + str(ret))
-        elif(childs == 4):
-            print("Dict \"" + tree.children[0] + "\" => " + str(ret))
-        else:
+
+        if childs != 1 and childs != 4:
             start = 3
             while start < childs-1:
                 ret[self.visit(tree.children[start])] = self.visit(tree.children[start+2]) 
                 start += 4
-            print("Dict \"" + tree.children[0] + "\" => " + str(ret))
+            #print("Dict \"" + tree.children[0] + "\" => " + str(ret))
             sizeD = len(ret)
         
         self.struct_vars[tree.children[0].value] = ("dict", sizeD, ret, 0)
+
+        pass
 
     def atrib(self,tree):
 
@@ -232,10 +217,15 @@ class MyInterpreter (Interpreter):
             self.instructions["atrib"] += 1
 
         if str(tree.children[0]) not in self.errors.keys():
-                self.errors[str(tree.children[1])] = []
+            self.errors[str(tree.children[0])] = set()
+
         if str(tree.children[0]) not in self.atomic_vars.keys():
-            self.errors[str(tree.children[0])].append("Variable \"" + tree.children[0] + "\" was not declared")
+            self.errors[str(tree.children[0])].add("Variable \"" + tree.children[0] + "\" was not declared")
             self.correct = False
+            typeV = "undefined"
+            valueV = None
+            self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,0,1])
+
         else:
             typeV = self.atomic_vars[str(tree.children[0])][0]
             valueV = self.visit(tree.children[2])
@@ -250,14 +240,16 @@ class MyInterpreter (Interpreter):
             self.instructions["atrib"] += 1
 
         if str(tree.children[0]) not in self.errors.keys():
-                self.errors[str(tree.children[0])] = []
+                self.errors[str(tree.children[0])] = set()
         if str(tree.children[0]) not in self.atomic_vars.keys():
-            self.errors[str(tree.children[0])].append("Variable \"" + tree.children[0] + "\" was not declared")
+            self.errors[str(tree.children[0])].add("Variable \"" + tree.children[0] + "\" was not declared")
             self.correct = False
         else:
             typeV = self.atomic_vars[tree.children[0]][0]
             valueV = self.visit(tree.children[2])
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
+
+        pass
 
     def print(self,tree):
         if "print" not in self.instructions.keys():
@@ -268,12 +260,12 @@ class MyInterpreter (Interpreter):
 
         if tree.children[1].type == "VARNAME":
             if str(tree.children[1]) not in self.errors.keys():
-                self.errors[str(tree.children[1])] = []
+                self.errors[str(tree.children[1])] = set()
             if str(tree.children[1]) not in self.atomic_vars.keys():
-                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" was not declared")
+                self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" was not declared")
                 self.correct = False
             elif not self.atomic_vars[str(tree.children[1])][2]:
-                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" declared but not initialized")
+                self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" declared but not initialized")
                 self.correct = False
             else:
                 print("> " + str(self.atomic_vars[tree.children[1]][1]))
@@ -292,19 +284,19 @@ class MyInterpreter (Interpreter):
             self.instructions["read"] += 1
 
         if str(tree.children[1]) not in self.errors.keys():
-            self.errors[str(tree.children[1])] = []
+            self.errors[str(tree.children[1])] = set()
 
         if str(tree.children[1]) not in self.atomic_vars.keys():
             if str(tree.children[1]) in self.struct_vars.keys():
-                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" cannot be defined by user input.")
+                self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" cannot be defined by user input.")
             else:
-                self.errors[str(tree.children[1])].append("Variable \"" + tree.children[1] + "\" was not declared")
+                self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" was not declared")
             self.correct = False
         
         else:
             self.atomic_vars[tree.children[1]][1] = input("> ")
 
-        
+        pass
 
     def cond(self,tree):
         if "if" not in self.instructions.keys():
@@ -312,8 +304,21 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["if"] += 1
 
+        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
+        parents = []
+        for id in self.controlStructs.keys():
+            if self.controlStructs[id][1] == 1:
+                parents.append(id)
+
+        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
+        self.controlStructs[(self.controlID)] = tuple(["if",1,parents])
+        # Incrementamos o ID para a proxima estrutura de controlo
+        self.controlID += 1
+
+        # Usamos o contador de ifs para definir os ids das estruturas de controlo
         self.if_count += 1
         self.if_depth[self.if_count] = self.nivel_if
+
         l = len(tree.children)
 
         self.visit(tree.children[2])
@@ -322,7 +327,6 @@ class MyInterpreter (Interpreter):
 
         if(tree.children[(l-2)] == "else"):
             self.visit(tree.children[(l-1)])
-            print("Existe um else")
 
         pass
 
@@ -332,12 +336,26 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["while"] += 1
 
+        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
+        parents = []
+        for id in self.controlStructs.keys():
+            if self.controlStructs[id][1] == 1:
+                parents.append(id)
+
+        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
+        self.controlStructs[self.controlID] = tuple(["while",1,parents])
+        # Incrementamos o ID para a proxima estrutura de controlo
+        self.controlID += 1
+
         aux = self.nivel_if 
         self.nivel_if = 0
         self.inCicle = True
+
         self.visit(tree.children[4])
+        
         self.inCicle = False
         self.nivel_if = aux
+
         pass
 
     def ciclefor(self,tree):
@@ -346,14 +364,29 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["for"] += 1
 
+        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
+        parents = []
+        for id in self.controlStructs.keys():
+            if self.controlStructs[id][1] == 1:
+                parents.append(id)
+
+        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
+        self.controlStructs[self.controlID] = tuple(["for",1,parents])
+        # Incrementamos o ID para a proxima estrutura de controlo
+        self.controlID += 1
+
         aux = self.nivel_if 
         self.nivel_if = 0
         self.inCicle = True
+
         for c in tree.children:
             if c != "for" and c != "(" and c != ")" and c != ";" and c != ",":
                 self.visit(c)
+        
         self.inCicle = False
         self.nivel_if = aux
+
+        pass
 
     def inc(self, tree):
         typeV = self.atomic_vars[str(tree.children[0])][0]
@@ -363,11 +396,11 @@ class MyInterpreter (Interpreter):
         pass
 
     def dec(self, tree):
-
-
         typeV = self.atomic_vars[str(tree.children[0])][0]
         valueV = self.atomic_vars[str(tree.children[0])][1] - 1
         self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
+
+        pass
 
     def ciclerepeat(self,tree):
         if "repeat" not in self.instructions.keys():
@@ -375,26 +408,48 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["repeat"] += 1
 
-        #print(tree.pretty())
+        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
+        parents = []
+        for id in self.controlStructs.keys():
+            if self.controlStructs[id][1] == 1:
+                parents.append(id)
+
+        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
+        self.controlStructs[self.controlID] = tuple(["repeat",1,parents])
+        # Incrementamos o ID para a proxima estrutura de controlo
+        self.controlID += 1
+
         aux = self.nivel_if 
         self.nivel_if = 0
         self.inCicle = True
+        
         self.visit(tree.children[4])
+        
         self.inCicle = False
         self.nivel_if = aux
+
         pass
 
     def body(self,tree):
         self.visit_children(tree)
+
         pass
 
     def open(self,tree):
         if not self.inCicle:
             self.nivel_if += 1
+
         pass
 
     def close(self,tree):
         self.nivel_if -= 1
+
+        newDict = dict(filter(lambda elem: elem[1][1] == 1, self.controlStructs.items()))
+
+        k = max(newDict.keys())
+        self.controlStructs[k] = (self.controlStructs[k][0],0,self.controlStructs[k][2])
+
+
         pass
 
     def op(self,tree):
@@ -419,6 +474,7 @@ class MyInterpreter (Interpreter):
                     r = 0
         else:
             r = self.visit(tree.children[0])
+
         return r
 
     def factcond(self,tree):
@@ -470,6 +526,7 @@ class MyInterpreter (Interpreter):
                 r = t1 - t2
         else:
             r = self.visit(tree.children[0])
+
         return r
 
     def termocond(self,tree):
@@ -492,24 +549,30 @@ class MyInterpreter (Interpreter):
         if tree.children[0].type == 'SIGNED_INT':
             r = int(tree.children[0])
         elif tree.children[0].type == 'VARNAME':
+
             if str(tree.children[0]) not in self.errors.keys():
-                self.erros[str(tree.children[0])] = []
+                self.erros[str(tree.children[0])] = set()
 
             if str(tree.children[0]) not in self.atomic_vars.keys():
-                self.errors[str(tree.children[0])].append("Undeclared variable \"" + str(tree.children[0]) + "\"")
+                self.errors[str(tree.children[0])].add("Undeclared variable \"" + str(tree.children[0]) + "\"")
                 self.correct = False
                 r = -1
-            elif self.atomic_vars[str(tree.children[0])][1] == None:
-                self.errors[str(tree.children[0])].append("Variable \"" + str(tree.children[0]) + "\" was never initialized")
+            elif self.atomic_vars[str(tree.children[0])][2] == 0:
+                self.errors[str(tree.children[0])].add("Variable \"" + str(tree.children[0]) + "\" was never initialized")
                 self.correct = False
-                r = -1
+                r = self.atomic_vars[str(tree.children[0])][1]
+                typeV = self.atomic_vars[str(tree.children[0])][0]
+                initV = self.atomic_vars[str(tree.children[0])][2]
+                self.atomic_vars[str(tree.children[0])] = tuple([typeV,r,initV,1])
             else:
                 r = self.atomic_vars[str(tree.children[0])][1]
                 typeV = self.atomic_vars[str(tree.children[0])][0]
-                self.atomic_vars[str(tree.children[0])] = tuple([typeV,r,0,1])
-                print("DEBUG " + str(tree.children[0]))
+                initV = self.atomic_vars[str(tree.children[0])][2]
+                self.atomic_vars[str(tree.children[0])] = tuple([typeV,r,initV,1])
+
         elif tree.children[0] == "(":
             r = self.visit(tree.children[1])
+
         return r
 
 grammar = '''
@@ -603,6 +666,9 @@ float c;
 float d = 3.4;
 string e;
 string f = "ola";
+int a;
+
+z = 3;
 
 /*structures*/
 set g;
@@ -640,14 +706,16 @@ if(a == 0){
     }
 }
 if(a == 1){
-    print("kek");
+    if(a == 0){
+        print("coco");
+    }
 }
 }-
 '''
 parse_tree = parserLark.parse(example)
 data = MyInterpreter().visit(parse_tree)
 
-def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, output_html):
+def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, output_html, control):
     output_html.write("<!DOCTYPE html>")
     output_html.write("<html lang=\"pt\">")
     output_html.write("<head>")
@@ -742,11 +810,37 @@ def geraHTMLVars(atomic_vars, struct_vars, warnings, errors, nrStructs, instruco
     output_html.write("<td>" + str(total) + "</td>")
     output_html.write("</table>")
 
+    ##
+
+    output_html.write("<h1> Estruturas de controlo </h1>")
+    output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
+    output_html.write("<tr class=\"w3-yellow\">")
+    output_html.write("<th>ID</th>")
+    output_html.write("<th>Type</th>")
+    output_html.write("<th>Parents</th>")
+    output_html.write("</tr>")
+
+    total = 0
+
+    for c in control.keys():
+        output_html.write("<tr>")
+        output_html.write("<td>" + str(c) + "</td>")
+        output_html.write("<td>" + str(control[c][0]) + "</td>")
+        output_html.write("<td>" + str(control[c][2]) + "</td>")
+        output_html.write("</tr>")
+        total += 1
+
+    output_html.write("<td>Total</td>")
+    output_html.write("<td>" + str(total) + "</td>")
+    output_html.write("</table>")
+
     output_html.write("</body>")
     output_html.write("</html>")
 
 output_html = open("output.html", "w")
 
 #1 e 2 e 3
-geraHTMLVars(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
-data["instructions"] ,output_html)
+geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
+data["instructions"] ,output_html, data["controlStructs"])
+
+print(data["if_depth"])
