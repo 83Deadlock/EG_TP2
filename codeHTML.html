@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+    <style>
+        .error {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black;
+            color: red;
+        }
+
+        .code {
+            position: relative;
+            display: inline-block;
+        }
+
+        .comment {
+            position: relative;
+            display: inline-block;
+            color: grey;
+        }
+
+        .error .errortext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -40px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .error .errortext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 20%;
+            margin-left: -5px;
+            border-width: 5px;
+            1border-style: solid;
+            border-color: #555 transparent transparent transparent;
+        }
+
+        .error:hover .errortext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style><body>
+<pre><body>
+<p class="code">
+-{
+</p>
+<p class="comment">
+/*atoms*/
+</p>
+<p class="code">
+int a;
+</p>
+<p class="code">
+read(a);
+</p>
+<p class="code">
+int b = 1 + 1;
+</p>
+<p class="code">
+float c;
+</p>
+<p class="code">
+float d = 3.4;
+</p>
+<p class="code">
+string e;
+</p>
+<p class="code">
+string f = "ola";
+</p>
+<p class="code">
+<div class="error">z = 3<span class="errortext">Variable undeclared</span></div>;
+</p>
+<p class="comment">
+/*structures*/
+</p>
+<p class="code">
+set g;
+</p>
+<p class="code">
+set h = {};
+</p>
+<p class="code">
+set i = {1, "ola", 3.2};
+</p>
+<p class="code">
+list j;
+</p>
+<p class="code">
+list k = [];
+</p>
+<p class="code">
+list l = [1, "ola", 3.2];
+</p>
+<p class="code">
+tuple m;
+</p>
+<p class="code">
+tuple n = ();
+</p>
+<p class="code">
+tuple o = (1, "ola", 3.2);
+</p>
+<p class="code">
+dict p;
+</p>
+<p class="code">
+dict q = {};
+</p>
+<p class="code">
+dict r = {1 : "ola", 3.2 : "mundo"};
+</p>
+<p class="code">
+while(a < 0){
+</p>
+<p class="code">
+print("while");
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+for(a = 0; a < 20; a++){
+</p>
+<p class="code">
+print("oi");
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+repeat(5){
+</p>
+<p class="code">
+print("ola");
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+if(a == 0){
+</p>
+<p class="code">
+if(<div class="error">c<span class="errortext">Variable was never initialized</span></div> == 3){
+</p>
+<p class="code">
+print("olaMundo");
+</p>
+<p class="code">
+for(a = 3; a == 3; a++){
+</p>
+<p class="code">
+print("reset");
+</p>
+<p class="code">
+if(<div class="error">c<span class="errortext">Variable was never initialized</span></div> != 3){
+</p>
+<p class="code">
+print(b);
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+if(a == 1){
+</p>
+<p class="code">
+if(a == 0){
+</p>
+<p class="code">
+print("coco");
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+}
+</p>
+<p class="code">
+}-
+</p>
+
+</body></html>
