@@ -2,7 +2,6 @@
 /*atoms*/
 int a;
 read(a);
-);
 int b = 1 + 1;
 float c;
 float d = 3.4;
@@ -45,6 +44,11 @@ print(b);
 if(a == 1){
 if(a == 0){
 print("coco");
+int y = 3;
+int pila = 141;
+while(y < 5){
+y = y + 1;
+}
 }
 }
 }-

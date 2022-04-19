@@ -18,10 +18,17 @@ class MyInterpreter (Interpreter):
         self.instructions = {}
         self.controlID = 0
         self.controlStructs = {}
+        self.if_concat = False
+        self.ifCat = ""
+        self.body_cat = False
+        self.bodyCat = ""
+
 
         self.if_parts = {}
         self.code = ""
         self.html_body = ""
+
+        self.ident_level = 0
 
         self.atomic_vars = dict()
         # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
@@ -37,7 +44,9 @@ class MyInterpreter (Interpreter):
         print(self.TAG + "\n\tSTART")
         self.code += "-{\n"
         self.html_body += "<pre><body>\n<p class=\"code\">\n-{\n</p>\n"
+        self.ident_level += 1
         self.visit(tree.children[1])
+        self.ident_level -= 1
         self.html_body += "<p class=\"code\">\n}-\n</p>\n"
         self.code += "}-\n"
         print(self.TAG + "\n\tFINISH")
@@ -65,9 +74,6 @@ class MyInterpreter (Interpreter):
             if self.struct_vars[var][3] == 0:
                 self.warnings[var].append("Variable \"" + var + "\" was never used.")
 
-
-        print("a -> " + str(self.atomic_vars['a']))
-
         self.output["atomic_vars"] = self.atomic_vars
         self.output["struct_vars"] = self.struct_vars
         self.output["correct"] = self.correct
@@ -81,6 +87,18 @@ class MyInterpreter (Interpreter):
         self.output["if_parts"] = self.if_parts
         self.output["code"] = self.code
         self.output["html_body"] = self.html_body
+
+        for i in range(1,len(self.if_parts.keys()) + 1):
+            self.if_concat = True
+            #print(str(i) + " -> " + str(self.if_parts[i][0].pretty()))
+            #print(str(i) + " -> " + str(self.if_parts[i][1].pretty()))
+            self.visit(self.if_parts[i][0])
+            print(str(i) + " -> " + self.ifCat)
+            self.ifCat = ""
+
+        self.body_cat = True
+        self.visit(self.if_parts[len(self.if_parts.keys())][1])
+        print(self.bodyCat)
 
         return self.output
 
@@ -97,9 +115,17 @@ class MyInterpreter (Interpreter):
 
     def comment(self, tree):
         comment = tree.children[0].value
-        self.code += comment + "\n"
-        self.html_body += "<p class=\"comment\">\n" + comment + "\n</p>\n"
-        #print("\t-=AUTHOR'S COMMENT=-\n\t\t" + comment[2:(len(comment)-2)])
+        if self.body_cat:
+            self.bodyCat += comment + "\n"
+        else:
+            self.code += comment + "\n"
+            self.html_body += "<p class=\"comment\">\n" 
+
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+
+            self.html_body += comment + "\n</p>\n"
+            #print("\t-=AUTHOR'S COMMENT=-\n\t\t" + comment[2:(len(comment)-2)])
 
         pass
 
@@ -121,19 +147,26 @@ class MyInterpreter (Interpreter):
         if var_name not in self.errors.keys():
             self.errors[var_name] = set()
         
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
 
         flag = False
 
         if(var_name in self.atomic_vars.keys() or var_name in self.struct_vars.keys()):
             self.correct = False
             self.errors[var_name].add("Variable \"" + var_name + "\" declared more than once!")
-            self.html_body += "<div class=\"error\">"+var_type + " " + var_name
+            if not self.body_cat:
+                self.html_body += "<div class=\"error\">"+var_type + " " + var_name
             flag = True
 
-        self.code += var_type + " " + var_name
-        if not flag:
-            self.html_body += var_type + " " + var_name
+        if self.body_cat:
+            self.bodyCat += var_type + " " + var_name
+        else:
+            self.code += var_type + " " + var_name
+            if not flag:
+                self.html_body += var_type + " " + var_name
 
         var_value = None
         if flag == True:
@@ -142,8 +175,11 @@ class MyInterpreter (Interpreter):
         used = 0
 
         if(len(tree.children) > 3):
-            self.code += " = " 
-            self.html_body += " = "
+            if self.body_cat:
+                self.bodyCat += " = "
+            else:
+                self.code += " = " 
+                self.html_body += " = "
             var_value = self.visit(tree.children[3])
             print("RETORNA => " + str(var_value))
             init = 1
@@ -156,30 +192,33 @@ class MyInterpreter (Interpreter):
         val = (var_type,var_value,init,used)
         self.atomic_vars[var_name] = val
 
-        if flag:
+        if flag and not self.body_cat:
             self.html_body += "<span class=\"errortext\">Variable declared more than once!</span></div>"
 
         flag = False
 
-        self.code += ";\n"
-        self.html_body += ";\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += ";\n"
+        else:
+            self.code += ";\n"
+            self.html_body += ";\n</p>\n"
 
         pass
 
     def elem(self, tree):
 
         if(not isinstance(tree.children[0], Tree)):
-            if(tree.children[0].type == "ESCAPED_STRING"):
+            if self.body_cat:
+                self.bodyCat += str(tree.children[0])
+            else:
                 self.code += str(tree.children[0])
                 self.html_body += str(tree.children[0])
+
+            if(tree.children[0].type == "ESCAPED_STRING"):
                 return str(tree.children[0].value[1:(len(tree.children[0].value)-1)])
             elif(tree.children[0].type == "DECIMAL"):
-                self.code += str(tree.children[0])
-                self.html_body += str(tree.children[0])
                 return float(tree.children[0].value)
             elif(tree.children[0].type == "SIGNED_INT"):
-                self.code += str(tree.children[0])
-                self.html_body += str(tree.children[0])
                 return int(tree.children[0].value)
         else:
             r = self.visit(tree.children[0])
@@ -196,137 +235,225 @@ class MyInterpreter (Interpreter):
         pass
  
     def set(self, tree):
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+
         ret = set()
         childs = len(tree.children)
         sizeS = 0
-        self.code += "set " + tree.children[0].value
-        self.html_body += "set " + tree.children[0].value
-        print(tree.pretty())
+
+        if self.body_cat:
+            self.bodyCat += "set " + tree.children[0].value
+        else:
+            self.code += "set " + tree.children[0].value
+            self.html_body += "set " + tree.children[0].value
+
         if childs != 1 and childs != 4:
-            self.code += " = "
-            self.html_body += " = "
+            if self.body_cat:
+                self.bodyCat += " = "
+            else:
+                self.code += " = "
+                self.html_body += " = "
             for c in tree.children[2:]:
                 if c != "{" and c != "}" and c != ",":
                     ret.add(self.visit(c))
                 if c == "{" or c == "}" or c == ",":
-                    self.code += c.value
-                    self.html_body += c.value
+                    if self.body_cat:
+                        self.bodyCat += c.value
+                    else:
+                        self.code += c.value
+                        self.html_body += c.value
                     if c == ",":
-                        self.code += " "
-                        self.html_body += " "
-            #print("Set \"" + tree.children[0] + "\" => " + str(ret))
+                        if self.body_cat:
+                            self.bodyCat += " "
+                        else:
+                            self.code += " "
+                            self.html_body += " "
             sizeS = len(ret)            
         elif childs == 4:
-            self.code += " = {}"
-            self.html_body += " = {}"
-        self.code += ";\n"
-        self.html_body += ";\n</p>\n"
+            if self.body_cat:
+                self.bodyCat += " = {}"
+            else:
+                self.code += " = {}"
+                self.html_body += " = {}"
+
+        if self.body_cat:
+            self.bodyCat += ";\n"
+        else:
+            self.code += ";\n"
+            self.html_body += ";\n</p>\n"
+
         self.struct_vars[tree.children[0].value] = ("set", sizeS, ret, 0)
 
 
         pass
 
     def list(self, tree):
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
 
         ret = list()
         childs = len(tree.children)
         sizeL = 0
-        self.code += "list " + tree.children[0].value
-        self.html_body += "list " + tree.children[0].value
+        if self.body_cat:
+            self.bodyCat += "list " + tree.children[0].value
+        else:
+            self.code += "list " + tree.children[0].value
+            self.html_body += "list " + tree.children[0].value
 
         if childs != 1 and childs != 4:
-            self.code += " = "
-            self.html_body += " = "
+            if self.body_cat:
+                self.bodyCat += " = "
+            else:
+                self.code += " = "
+                self.html_body += " = "
             for c in tree.children[2:]:
                 if c != "[" and c != "]" and c != ",":
                     ret.append(self.visit(c))
                 if c == "[" or c == "]" or c == ",":
-                    self.code += c.value
-                    self.html_body += c.value
+                    if self.body_cat:
+                        self.bodyCat += c.value
+                    else:
+                        self.code += c.value
+                        self.html_body += c.value
                     if c == ",":
-                        self.code += " "
-                        self.html_body += " "
-            #print("List \"" + tree.children[0] + "\" => " + str(ret))
+                        if self.body_cat:
+                            self.bodyCat += " "
+                        else:
+                            self.code += " "
+                            self.html_body += " "
             sizeL = len(ret)
         elif childs == 4:
-            self.code += " = []"
-            self.html_body += " = []"
+            if self.body_cat:
+                self.bodyCat += " = []"
+            else:
+                self.code += " = []"
+                self.html_body += " = []"
 
-        self.code += ";\n"
-        self.html_body += ";\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += ";\n"
+        else:
+            self.code += ";\n"
+            self.html_body += ";\n</p>\n"
 
         self.struct_vars[tree.children[0].value] = ("list", sizeL, ret, 0)
 
         pass
 
     def tuple(self, tree):
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+
         aux = list()
         ret = tuple()
         sizeT = 0
         childs = len(tree.children)
-        self.code += "tuple " + tree.children[0].value
-        self.html_body += "tuple " + tree.children[0].value
+        if self.body_cat:
+            self.bodyCat += "tuple " + tree.children[0].value
+        else:
+            self.code += "tuple " + tree.children[0].value
+            self.html_body += "tuple " + tree.children[0].value
         if childs != 1 and childs != 4:
-            self.code += " = "
-            self.html_body += " = "
+            if self.body_cat:
+                self.bodyCat += " = "
+            else:
+                self.code += " = "
+                self.html_body += " = "
             for c in tree.children[2:]:
                 if c != "(" and c != ")" and c != ",":
                     aux.append(self.visit(c))
                 if c == "(" or c == ")" or c == ",":
-                    self.code += c.value
-                    self.html_body += c.value
+                    if self.body_cat:
+                        self.bodyCat += c.value
+                    else:
+                        self.code += c.value
+                        self.html_body += c.value
                     if c == ",":
-                        self.code += " "
-                        self.html_body += " "
+                        if self.body_cat:
+                            self.bodyCat += " "
+                        else:
+                            self.code += " "
+                            self.html_body += " "
             ret = tuple(aux)
-            #print("Tuple \"" + tree.children[0] + "\" => " + str(ret))
             sizeT = len(ret)
         elif childs == 4:
-            self.code += " = ()"
-            self.html_body += " = ()"
+            if self.body_cat:
+                self.bodyCat += " = ()"
+            else:
+                self.code += " = ()"
+                self.html_body += " = ()"
 
-        self.code += ";\n"
-        self.html_body += ";\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += ";\n"
+        else:
+            self.code += ";\n"
+            self.html_body += ";\n</p>\n"
 
         self.struct_vars[tree.children[0].value] = ("tuple", sizeT, ret, 0)
 
         pass
 
     def dict(self, tree):
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
 
         ret = dict()
         childs = len(tree.children)
         sizeD = 0
-        self.code += "dict " + tree.children[0].value
-        self.html_body += "dict " + tree.children[0].value
+        if self.body_cat:
+            self.bodyCat += "dict " + tree.children[0].value
+        else:
+            self.code += "dict " + tree.children[0].value
+            self.html_body += "dict " + tree.children[0].value
         if childs != 1 and childs != 4:
-            self.code += " = {"
-            self.html_body += " = {"
+            if self.body_cat:
+                self.bodyCat += " = {"
+            else:
+                self.code += " = {"
+                self.html_body += " = {"
             start = 3
             while start < childs-1:
                 key = self.visit(tree.children[start])
-                self.code += " : "
-                self.html_body += " : "
+                if self.body_cat:
+                    self.bodyCat += " : "
+                else:
+                    self.code += " : "
+                    self.html_body += " : "
                 value = self.visit(tree.children[start+2])
                 if start + 4 < (childs-1):
-                    self.code += ", "
-                    self.html_body += ", "
+                    if self.body_cat:
+                        self.bodyCat += ", "
+                    else:
+                        self.code += ", "
+                        self.html_body += ", "
                 ret[key] = value 
                 start += 4
-            #print("Dict \"" + tree.children[0] + "\" => " + str(ret))
-            self.code += "}"
-            self.html_body += "}"
+            if self.body_cat:
+                self.bodyCat += "}"
+            else:
+                self.code += "}"
+                self.html_body += "}"
             sizeD = len(ret)
         elif childs == 4:
-            self.code += " = {}"
-            self.html_body += " = {}"
+            if self.body_cat:
+                self.bodyCat += " = {}"
+            else:
+                self.code += " = {}"
+                self.html_body += " = {}"
 
-        self.code += ";\n"
-        self.html_body += ";\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += ";\n"
+        else: 
+            self.code += ";\n"
+            self.html_body += ";\n</p>\n"
         
         self.struct_vars[tree.children[0].value] = ("dict", sizeD, ret, 0)
 
@@ -339,9 +466,13 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["atrib"] += 1
 
-        self.html_body += "<p class=\"code\">\n"
-
-        self.code += tree.children[0].value + " = "
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+            self.code += tree.children[0].value + " = "
+        else:
+            self.bodyCat += tree.children[0].value + " = "
 
         if str(tree.children[0]) not in self.errors.keys():
             self.errors[str(tree.children[0])] = set()
@@ -351,19 +482,25 @@ class MyInterpreter (Interpreter):
             self.correct = False
             typeV = "undefined"
             valueV = None
-            self.html_body += "<div class=\"error\">" + tree.children[0].value + " = "
+            if not self.body_cat:
+                self.html_body += "<div class=\"error\">" + tree.children[0].value + " = "
             valueV = self.visit(tree.children[2])
-            self.html_body += "<span class=\"errortext\">Variable undeclared</span></div>"
+            if not self.body_cat:
+                self.html_body += "<span class=\"errortext\">Variable undeclared</span></div>"
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,0,1])
 
         else:
             typeV = self.atomic_vars[str(tree.children[0])][0]
-            self.html_body += tree.children[0].value + " = "
+            if not self.body_cat:
+                self.html_body += tree.children[0].value + " = "
             valueV = self.visit(tree.children[2])
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
 
-        self.html_body += ";\n</p>\n"
-        self.code += ";\n"
+        if self.body_cat:
+            self.bodyCat += ";\n"
+        else:
+            self.html_body += ";\n</p>\n"
+            self.code += ";\n"
             
         pass
 
@@ -373,21 +510,25 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["atrib"] += 1
 
-        self.code += tree.children[0].value + " = "
-        
-
+        if self.body_cat:
+            self.bodyCat += tree.children[0].value + " = "
+        else: 
+            self.code += tree.children[0].value + " = "
 
         if str(tree.children[0]) not in self.errors.keys():
             self.errors[str(tree.children[0])] = set()
         if str(tree.children[0]) not in self.atomic_vars.keys():
             self.errors[str(tree.children[0])].add("Variable \"" + tree.children[0] + "\" was not declared")
-            self.html_body += "<div class=\"error\">"+tree.children[0].value + " = "
+            if not self.body_cat:
+                self.html_body += "<div class=\"error\">"+tree.children[0].value + " = "
             valueV = self.visit(tree.children[2])
-            self.html_body += "<span class=\"errortext\">Variable was not declared</span></div>"
+            if not self.body_cat:
+                self.html_body += "<span class=\"errortext\">Variable was not declared</span></div>"
             self.correct = False
         else:
             typeV = self.atomic_vars[tree.children[0]][0]
-            self.html_body += tree.children[0].value + " = "
+            if not self.body_cat:
+                self.html_body += tree.children[0].value + " = "
             valueV = self.visit(tree.children[2])
             self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
 
@@ -399,35 +540,52 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["print"] += 1
 
-        self.html_body += "<p class=\"code\">\nprint("
-
-        self.code += "print("
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+            self.html_body += "print("
+            self.code += "print("
+        else:
+            self.bodyCat += "print("
 
         if tree.children[1].type == "VARNAME":
-            self.code += tree.children[1].value
+            if self.body_cat:
+                self.bodyCat += tree.children[1].value
+            else:
+                self.code += tree.children[1].value
             if str(tree.children[1]) not in self.errors.keys():
                 self.errors[str(tree.children[1])] = set()
             if str(tree.children[1]) not in self.atomic_vars.keys():
                 self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" was not declared")
-                self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable undeclared</span></div>"
+                if not self.body_cat:
+                    self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable undeclared</span></div>"
                 self.correct = False
             elif not self.atomic_vars[str(tree.children[1])][2]:
                 self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" declared but not initialized")
-                self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable was never initialized</span></div>"
+                if not self.body_cat:
+                    self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable was never initialized</span></div>"
                 self.correct = False
             else:
                 print("> " + str(self.atomic_vars[tree.children[1]][1]))
-                self.html_body += tree.children[1].value
+                if not self.body_cat:
+                    self.html_body += tree.children[1].value
             
         elif tree.children[1].type == "ESCAPED_STRING":
-            self.code += tree.children[1].value
-            self.html_body += tree.children[1].value
+            if self.body_cat:
+                self.bodyCat += tree.children[1].value
+            else: 
+                self.code += tree.children[1].value
+                self.html_body += tree.children[1].value
             s = tree.children[1]
             s = s.replace("\"","")
             print("> " + s)
         
-        self.code += ");\n"
-        self.html_body += ");\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += ");\n"
+        else:
+            self.code += ");\n"
+            self.html_body += ");\n</p>\n"
             
         pass
 
@@ -437,8 +595,14 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["read"] += 1
 
-        self.code += "read(" + tree.children[1].value + ");\n"
-        self.html_body += "<p class=\"code\">\nread("
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+            self.html_body += "read("
+            self.code += "read(" + tree.children[1].value
+        else:
+            self.bodyCat += "read(" + tree.children[1].value
 
         if str(tree.children[1]) not in self.errors.keys():
             self.errors[str(tree.children[1])] = set()
@@ -446,14 +610,17 @@ class MyInterpreter (Interpreter):
         if str(tree.children[1]) not in self.atomic_vars.keys():
             if str(tree.children[1]) in self.struct_vars.keys():
                 self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" cannot be defined by user input.")
-                self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable is a structure</span></div>"
+                if not self.body_cat:
+                    self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable is a structure</span></div>"
             else:
                 self.errors[str(tree.children[1])].add("Variable \"" + tree.children[1] + "\" was not declared")
-                self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable undeclared</span></div>"
+                if not self.body_cat:
+                    self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable undeclared</span></div>"
             self.correct = False
         
         else:
-            self.html_body += tree.children[1].value
+            if not self.body_cat:
+                self.html_body += tree.children[1].value
             value = input("> ")
             typeV = self.atomic_vars[tree.children[1]][0]
             initV = 1
@@ -461,8 +628,11 @@ class MyInterpreter (Interpreter):
             val = int(value)
             self.atomic_vars[tree.children[1]] = tuple([typeV, val, initV, usedV])
 
-        self.code += ");\n"        
-        self.html_body += ");\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += ");\n"
+        else:
+            self.code += ");\n"        
+            self.html_body += ");\n</p>\n"
 
         pass
 
@@ -472,7 +642,10 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["if"] += 1
 
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
 
 
         # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
@@ -494,17 +667,26 @@ class MyInterpreter (Interpreter):
 
         l = len(tree.children)
 
-        self.code += "if("
-        self.html_body += "if("
+        if self.body_cat:
+            self.bodyCat += "if("
+        else:
+            self.code += "if("
+            self.html_body += "if("
         self.visit(tree.children[2])
-        self.code += ")"
-        self.html_body += ")"
+        if self.body_cat:
+            self.bodyCat += ")"
+        else:
+            self.code += ")"
+            self.html_body += ")"
 
         self.visit(tree.children[4])     
 
         if(tree.children[(l-2)] == "else"):
-            self.code += " else "
-            self.html_body += " else "
+            if self.body_cat:
+                self.bodyCat += " else "
+            else:
+                self.code += " else "
+                self.html_body += " else "
             self.visit(tree.children[(l-1)])
 
         pass
@@ -515,7 +697,10 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["while"] += 1
 
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
 
         # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
         parents = []
@@ -532,13 +717,19 @@ class MyInterpreter (Interpreter):
         self.nivel_if = 0
         self.inCicle = True
 
-        self.code += "while("
-        self.html_body += "while("
+        if self.body_cat:
+            self.bodyCat +=  "while("
+        else:
+            self.code += "while("
+            self.html_body += "while("
 
         self.visit(tree.children[2])
 
-        self.code += ")"
-        self.html_body += ")"
+        if self.body_cat:
+            self.bodyCat += ")"
+        else:
+            self.code += ")"
+            self.html_body += ")"
 
         self.visit(tree.children[4])
         
@@ -568,17 +759,26 @@ class MyInterpreter (Interpreter):
         self.nivel_if = 0
         self.inCicle = True
 
-        self.html_body += "<p class=\"code\">\n"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
 
         for c in tree.children:
             if c != "for" and c != "(" and c != ")" and c != ";" and c != ",":
                 self.visit(c)
             if c == "for" or c == "(" or c == ")" or c == ";" or c == ",":
-                self.code += c.value
-                self.html_body += c.value
+                if self.body_cat:
+                    self.bodyCat += c.value
+                else:
+                    self.code += c.value
+                    self.html_body += c.value
                 if(c == ";" or c == ","):
-                    self.code += " "
-                    self.html_body += " "
+                    if self.body_cat:
+                        self.bodyCat += " "
+                    else:
+                        self.code += " "
+                        self.html_body += " "
         
         self.inCicle = False
         self.nivel_if = aux
@@ -586,8 +786,11 @@ class MyInterpreter (Interpreter):
         pass
 
     def inc(self, tree):
-        self.code += tree.children[0] + "++"
-        self.html_body += tree.children[0] + "++"
+        if self.body_cat:
+            self.bodyCat += tree.children[0] + "++"
+        else:
+            self.code += tree.children[0] + "++"
+            self.html_body += tree.children[0] + "++"
         typeV = self.atomic_vars[str(tree.children[0])][0]
         valueV = self.atomic_vars[str(tree.children[0])][1] + 1
         self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
@@ -595,8 +798,11 @@ class MyInterpreter (Interpreter):
         pass
 
     def dec(self, tree):
-        self.code += tree.children[0] + "--"
-        self.html_body += tree.children[0] + "--"
+        if self.body_cat:
+            self.bodyCat += tree.children[0] + "--"
+        else:
+            self.code += tree.children[0] + "-"
+            self.html_body += tree.children[0] + "--"
         typeV = self.atomic_vars[str(tree.children[0])][0]
         valueV = self.atomic_vars[str(tree.children[0])][1] - 1
         self.atomic_vars[str(tree.children[0])] = tuple([typeV,valueV,1,1])
@@ -626,8 +832,15 @@ class MyInterpreter (Interpreter):
         
         print(tree.children)
 
-        self.code += "repeat(" + tree.children[2] + ")"
-        self.html_body += "<p class=\"code\">\nrepeat(" + tree.children[2].value + ")"
+        if not self.body_cat:
+            self.html_body += "<p class=\"code\">\n"
+            for i in range(self.ident_level):
+                self.html_body += "\t"
+
+            self.code += "repeat(" + tree.children[2].value + ")"
+            self.html_body += "repeat(" + tree.children[2].value + ")"
+        else:
+            self.bodyCat += "repeat(" + tree.children[2].value + ")"
 
         self.visit(tree.children[4])
         
@@ -644,8 +857,12 @@ class MyInterpreter (Interpreter):
     def open(self,tree):
         if not self.inCicle:
             self.nivel_if += 1
-        self.code += "{\n"
-        self.html_body += "{\n</p>\n"
+        if self.body_cat:
+            self.bodyCat += "{\n"
+        else:
+            self.code += "{\n"
+            self.ident_level += 1
+            self.html_body += "{\n</p>\n"
 
         pass
 
@@ -654,25 +871,47 @@ class MyInterpreter (Interpreter):
 
         newDict = dict(filter(lambda elem: elem[1][1] == 1, self.controlStructs.items()))
 
-        k = max(newDict.keys())
-        self.controlStructs[k] = (self.controlStructs[k][0],0,self.controlStructs[k][2])
+        if len(newDict.keys()) > 0:
+            k = max(newDict.keys())
+            self.controlStructs[k] = (self.controlStructs[k][0],0,self.controlStructs[k][2])
 
-        self.code += "}\n"
-        self.html_body += "<p class=\"code\">\n}\n</p>\n"
+        if not self.body_cat:
+            self.ident_level -= 1
+            self.code += "}\n"
+            if not self.body_cat:
+                self.html_body += "<p class=\"code\">\n"
+                for i in range(self.ident_level):
+                    self.html_body += "\t"
+            self.html_body += "}\n</p>\n"
+        else:
+            self.bodyCat += "}\n"
         pass
 
     def op(self,tree):
         if(len(tree.children) > 1):
             if(tree.children[0] == "!"):
-                self.code += "!"
-                self.html_body += "!"
+                
+                if self.if_concat:
+                    self.ifCat += "!"
+                elif self.body_cat:
+                    self.bodyCat += "!"
+                else:
+                    self.code += "!"
+                    self.html_body += "!"
                 r = int(self.visit(tree.children[1]))
                 if r == 0: r = 1
                 else: r = 0
             elif(tree.children[1] == "&"):
                 t1 = self.visit(tree.children[0])
-                self.code += " & "
-                self.html_body += " & "
+                
+                if self.if_concat:
+                    self.ifCat += " & "
+                elif self.body_cat:
+                    self.bodyCat += " & "
+                else:
+                    self.code += " & "
+                    self.html_body += " & "
+
                 t2 = self.visit(tree.children[2])
                 if t1 and t2:
                     r = 1
@@ -680,8 +919,14 @@ class MyInterpreter (Interpreter):
                     r = 0
             elif(tree.children[1] == "#"):
                 t1 = self.visit(tree.children[0])
-                self.code += " # "
-                self.html_body += " # "
+                if self.if_concat:
+                    self.ifCat += " # "
+                elif self.body_cat:
+                    self.bodyCat += " # "
+                else:
+                    self.html_body += " # "
+                    self.code += " # "
+
                 t2 = self.visit(tree.children[2])
                 if t1 or t2:
                     r = 1
@@ -695,8 +940,14 @@ class MyInterpreter (Interpreter):
     def factcond(self,tree):
         if len(tree.children) > 1:
             t1 = self.visit(tree.children[0])
-            self.code += " " + tree.children[1].value + " "
-            self.html_body += " " + tree.children[1].value + " "
+            if self.if_concat:
+                self.ifCat += " " + tree.children[1].value + " "
+            elif self.body_cat:
+                self.bodyCat += " " + tree.children[1].value + " "
+            else:
+                self.code += " " + tree.children[1].value + " "
+                self.html_body += " " + tree.children[1].value + " "
+
             t2 = self.visit(tree.children[2])
             if tree.children[1] == "<=":
                 if t1 <= t2:
@@ -736,8 +987,14 @@ class MyInterpreter (Interpreter):
     def expcond(self,tree):
         if len(tree.children) > 1:
             t1 = self.visit(tree.children[0])
-            self.code += " " + tree.children[1].value + " "
-            self.html_body += " " + tree.children[1].value + " "
+            if self.if_concat:
+                self.ifCat += " " + tree.children[1].value + " "
+            elif self.body_cat:
+                self.bodyCat += " " + tree.children[1].value + " "
+            else:
+                self.html_body += " " + tree.children[1].value + " "
+                self.code += " " + tree.children[1].value + " "
+
             t2 = self.visit(tree.children[2])
             if(tree.children[1] == "+"):
                 r = t1 + t2
@@ -751,8 +1008,14 @@ class MyInterpreter (Interpreter):
     def termocond(self,tree):
         if len(tree.children) > 1:
             t1 = self.visit(tree.children[0])
-            self.code += " " + tree.children[1].value + " "
-            self.html_body += " " + tree.children[1].value + " "
+            if self.if_concat:
+                self.ifCat += " " + tree.children[1].value + " "
+            elif self.body_cat:
+                self.bodyCat += " " + tree.children[1].value + " "
+            else:
+                self.code += " " + tree.children[1].value + " "
+                self.html_body += " " + tree.children[1].value + " "
+
             t2 = self.visit(tree.children[2])
             if(tree.children[1] == "*"):
                 r = t1 * t2
@@ -769,8 +1032,14 @@ class MyInterpreter (Interpreter):
         r = None
         if tree.children[0].type == 'SIGNED_INT':
             r = int(tree.children[0])
-            self.code += str(r)
-            self.html_body += str(r)
+            if self.if_concat:
+                self.ifCat += str(r)
+            elif self.body_cat:
+                self.bodyCat += str(r)
+            else:
+                self.code += str(r)
+                self.html_body += str(r)
+
         elif tree.children[0].type == 'VARNAME':
 
             if str(tree.children[0]) not in self.errors.keys():
@@ -779,12 +1048,14 @@ class MyInterpreter (Interpreter):
             if str(tree.children[0]) not in self.atomic_vars.keys():
                 self.errors[str(tree.children[0])].add("Undeclared variable \"" + str(tree.children[0]) + "\"")
                 self.correct = False
-                self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Undeclared Variable</span></div>"
+                if not self.if_concat and not self.body_cat:
+                    self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Undeclared Variable</span></div>"
                 r = -1
             elif self.atomic_vars[str(tree.children[0])][2] == 0:
                 print(tree.children[0].value + " -> " + str(self.atomic_vars[str(tree.children[0])]))
                 self.errors[str(tree.children[0])].add("Variable \"" + str(tree.children[0]) + "\" was never initialized")
-                self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Variable was never initialized</span></div>"
+                if not self.if_concat and not self.body_cat:
+                    self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Variable was never initialized</span></div>"
                 self.correct = False
                 r = self.atomic_vars[str(tree.children[0])][1]
                 typeV = self.atomic_vars[str(tree.children[0])][0]
@@ -794,10 +1065,16 @@ class MyInterpreter (Interpreter):
                 r = self.atomic_vars[str(tree.children[0])][1]
                 typeV = self.atomic_vars[str(tree.children[0])][0]
                 initV = self.atomic_vars[str(tree.children[0])][2]
-                self.html_body += tree.children[0].value
+                if not self.if_concat and not self.body_cat:
+                    self.html_body += tree.children[0].value
                 self.atomic_vars[str(tree.children[0])] = tuple([typeV,r,initV,1])
 
-            self.code += tree.children[0].value
+            if self.if_concat:
+                self.ifCat += tree.children[0].value
+            elif self.body_cat:
+                self.bodyCat += tree.children[0].value
+            else:
+                self.code += tree.children[0].value
 
 
         elif tree.children[0] == "(":
@@ -942,6 +1219,11 @@ if(a == 0){
 if(a == 1){
     if(a == 0){
         print("coco");
+        int y = 3;
+        int pila = 141;
+        while(y < 5){
+            y = y + 1;
+        }
     }
 }
 }-
@@ -1145,8 +1427,7 @@ html_header = '''<!DOCTYPE html>
 
 html = html_header + "<body>\n" + data["html_body"] + "\n</body></html>"
 
-
 with open("codeHTML.html","w") as out:
     out.write(html)
 
-print(data["html_body"])
+#print(data["html_body"])
