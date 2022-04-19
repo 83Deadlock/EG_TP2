@@ -1281,7 +1281,6 @@ if(a == 1){
     if(a == 0){
         print("coco");
         int y = 3 + 1;
-        int pila = 141;
         while(y < 5){
             y = y + 1;
         }
@@ -1295,7 +1294,6 @@ if(b==3){
         }
     }
 }
-
 }-
 '''
 parse_tree = parserLark.parse(example)
@@ -1327,10 +1325,22 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         output_html.write("<td>" + str(atomic_vars[var][0]) + "</td>")
         output_html.write("<td>" + str(atomic_vars[var][1]) + "</td>")
         if var in warnings.keys():
-            output_html.write("<td>" + str(warnings[var]) + "</td>")
+            if len(warnings[var]) == 0:
+                output_html.write("<td>Sem warnings associados</td>")
+            else:
+                w = ""
+                for string in warnings[var]:
+                    w += string + "\n"
+                output_html.write("<td>" + w + "</td>")
         
         if var in errors.keys():
-            output_html.write("<td>" + str(errors[var]) + "</td>")
+            if len(errors[var]) == 0:
+                output_html.write("<td>Sem erros associados</td>")
+            else:
+                erros = ""
+                for erro in errors[var]:
+                    erros += erro + " "
+                    output_html.write("<td>" + erros + "</td>")
           
         output_html.write("</tr>")
     output_html.write("</table>")
@@ -1353,7 +1363,13 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         output_html.write("<td>" + str(struct_vars[var][2]) + "</td>")
 
         if var in warnings.keys():
-            output_html.write("<td>" + str(warnings[var]) + "</td>")
+            if len(warnings[var]) == 0:
+                output_html.write("<td>Sem warnings associados</td>")
+            else:
+                w = ""
+                for string in warnings[var]:
+                    w += string + "\n"
+                output_html.write("<td>" + w + "</td>")
 
         output_html.write("</tr>")
 
@@ -1412,13 +1428,15 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         output_html.write("<tr>")
         output_html.write("<td>" + str(c) + "</td>")
         output_html.write("<td>" + str(control[c][0]) + "</td>")
-        output_html.write("<td>" + str(control[c][2]) + "</td>")
+        if len(control[c][2]) == 0:
+            output_html.write("<td>Sem parents associados</td>")
+        else:
+            id = ""
+            for ids in control[c][2]:
+                id += str(ids) + " | "
+            output_html.write("<td>ID's dos ciclos associados: " + id + "</td>")
         output_html.write("</tr>")
         total += 1
-
-    output_html.write("<td>Total</td>")
-    output_html.write("<td>" + str(total) + "</td>")
-    output_html.write("</table>")
 
     output_html.write("</body>")
     output_html.write("</html>")
@@ -1429,11 +1447,6 @@ output_html = open("output.html", "w")
 geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
 data["instructions"] ,output_html, data["controlStructs"])
 
-## juntar if 0 a n
-
-# cond = cond_0 and cond_1 and ... and cond_n
-# visit(cond)
-# visit(body_n)
 
 with open("outTest.ntz","w") as file:
     file.write(data["code"])
@@ -1497,5 +1510,3 @@ html = html_header + "<body>\n" + data["html_body"] + "\n</body></html>"
 
 with open("codeHTML.html","w") as out:
     out.write(html)
-
-#print(data["html_body"])
