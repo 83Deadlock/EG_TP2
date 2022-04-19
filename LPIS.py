@@ -88,17 +88,79 @@ class MyInterpreter (Interpreter):
         self.output["code"] = self.code
         self.output["html_body"] = self.html_body
 
-        for i in range(1,len(self.if_parts.keys()) + 1):
+        self.if_strings = {}
+        self.if_bodys = {}
+
+        for i in self.if_parts.keys():
             self.if_concat = True
-            #print(str(i) + " -> " + str(self.if_parts[i][0].pretty()))
-            #print(str(i) + " -> " + str(self.if_parts[i][1].pretty()))
             self.visit(self.if_parts[i][0])
-            print(str(i) + " -> " + self.ifCat)
+            self.if_strings[i] = self.ifCat
             self.ifCat = ""
 
-        self.body_cat = True
-        self.visit(self.if_parts[len(self.if_parts.keys())][1])
-        print(self.bodyCat)
+        self.if_concat = False
+        
+
+        for i in self.if_parts.keys():
+            self.body_cat = True
+            self.visit(self.if_parts[i][1])
+            self.if_bodys[i] = self.bodyCat
+            self.bodyCat = ""
+
+        self.body_cat = False
+
+        aux = {}
+        parentsSet = set()
+
+        for k,v in self.controlStructs.items():
+            l = v[2]
+            flag = True
+            parents = []
+            if len(l) == 0 or v[0] != "if":
+                flag = False
+            for p in l:
+                if self.controlStructs[p][0] != "if":
+                    flag = False
+                if p not in parentsSet:
+                    parentsSet.add(p)
+                    parents.append(p)
+
+            if flag:
+                aux[k] = tuple([v[0],v[1],parents])
+
+        auxIfs = {}
+        for k,t in aux.items():
+            p = t[2][0]
+            
+            if p not in auxIfs.keys():
+                auxIfs[p] = list()    
+            auxIfs[p].append(k)
+        
+        removeKeys = set()
+
+        for k,v in auxIfs.items():
+            for v1 in v:
+                if v1 in auxIfs.keys():
+                    auxIfs[k].append(auxIfs[v1][0])
+                    auxIfs[v1] = []
+                    removeKeys.add(v1)
+
+        for k in removeKeys:
+            auxIfs.pop(k)
+
+        sugestoes = {} 
+        
+        for k,l in auxIfs.items():
+            condS = self.if_strings[k]
+
+            for v in l:
+                condS += " & " + self.if_strings[v]
+
+            
+
+            bodyS = self.if_bodys[max(l)]
+            print(str(k) + " =>\n\tCOND =>\n\t\t"+condS+"\n\tBODY =>\n\t"+bodyS)
+
+
 
         return self.output
 
@@ -125,7 +187,6 @@ class MyInterpreter (Interpreter):
                 self.html_body += "\t"
 
             self.html_body += comment + "\n</p>\n"
-            #print("\t-=AUTHOR'S COMMENT=-\n\t\t" + comment[2:(len(comment)-2)])
 
         pass
 
@@ -181,7 +242,7 @@ class MyInterpreter (Interpreter):
                 self.code += " = " 
                 self.html_body += " = "
             var_value = self.visit(tree.children[3])
-            print("RETORNA => " + str(var_value))
+            #print("RETORNA => " + str(var_value))
             init = 1
             if "atrib" not in self.instructions.keys():
                 self.instructions["atrib"] = 1
@@ -567,7 +628,6 @@ class MyInterpreter (Interpreter):
                     self.html_body += "<div class=\"error\">" + tree.children[0].value + "<span class=\"errortext\">Variable was never initialized</span></div>"
                 self.correct = False
             else:
-                print("> " + str(self.atomic_vars[tree.children[1]][1]))
                 if not self.body_cat:
                     self.html_body += tree.children[1].value
             
@@ -579,7 +639,6 @@ class MyInterpreter (Interpreter):
                 self.html_body += tree.children[1].value
             s = tree.children[1]
             s = s.replace("\"","")
-            print("> " + s)
         
         if self.body_cat:
             self.bodyCat += ");\n"
@@ -654,8 +713,10 @@ class MyInterpreter (Interpreter):
             if self.controlStructs[id][1] == 1:
                 parents.append(id)
 
+        if not self.body_cat:
+            self.if_parts[self.controlID] = (tree.children[2],tree.children[4])
         # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
-        self.controlStructs[(self.controlID)] = tuple(["if",1,parents])
+            self.controlStructs[(self.controlID)] = tuple(["if",1,parents])
         # Incrementamos o ID para a proxima estrutura de controlo
         self.controlID += 1
 
@@ -663,7 +724,7 @@ class MyInterpreter (Interpreter):
         self.if_count += 1
         self.if_depth[self.if_count] = self.nivel_if
 
-        self.if_parts[self.if_count] = (tree.children[2],tree.children[4])
+        
 
         l = len(tree.children)
 
@@ -830,8 +891,6 @@ class MyInterpreter (Interpreter):
         self.nivel_if = 0
         self.inCicle = True
         
-        print(tree.children)
-
         if not self.body_cat:
             self.html_body += "<p class=\"code\">\n"
             for i in range(self.ident_level):
@@ -1036,6 +1095,7 @@ class MyInterpreter (Interpreter):
                 self.ifCat += str(r)
             elif self.body_cat:
                 self.bodyCat += str(r)
+                #print("r => " + str(r))
             else:
                 self.code += str(r)
                 self.html_body += str(r)
@@ -1052,7 +1112,7 @@ class MyInterpreter (Interpreter):
                     self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Undeclared Variable</span></div>"
                 r = -1
             elif self.atomic_vars[str(tree.children[0])][2] == 0:
-                print(tree.children[0].value + " -> " + str(self.atomic_vars[str(tree.children[0])]))
+                #print(tree.children[0].value + " -> " + str(self.atomic_vars[str(tree.children[0])]))
                 self.errors[str(tree.children[0])].add("Variable \"" + str(tree.children[0]) + "\" was never initialized")
                 if not self.if_concat and not self.body_cat:
                     self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Variable was never initialized</span></div>"
@@ -1168,7 +1228,8 @@ parserLark = Lark(grammar)
 example = '''-{ 
 /*atoms*/
 int a;
-read(a);
+a = 3;
+/*read(a);*/
 int b = 1 + 1;
 float c;
 float d = 3.4;
@@ -1219,13 +1280,22 @@ if(a == 0){
 if(a == 1){
     if(a == 0){
         print("coco");
-        int y = 3;
+        int y = 3 + 1;
         int pila = 141;
         while(y < 5){
             y = y + 1;
         }
     }
 }
+
+if(b==3){
+    if(b==3){
+        if(b==3){
+            print("3");
+        }
+    }
+}
+
 }-
 '''
 parse_tree = parserLark.parse(example)
@@ -1358,8 +1428,6 @@ output_html = open("output.html", "w")
 #1 e 2 e 3
 geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
 data["instructions"] ,output_html, data["controlStructs"])
-
-print(data["if_depth"])
 
 ## juntar if 0 a n
 
