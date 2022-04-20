@@ -1,4 +1,5 @@
 from dataclasses import InitVar
+from doctest import Example
 from mimetypes import init
 from lark import Discard
 from lark import Lark,Token,Tree
@@ -1225,77 +1226,8 @@ ELSE: "else"
 '''
 
 parserLark = Lark(grammar)
-example = '''-{ 
-/*atoms*/
-int a;
-a = 3;
-/*read(a);*/
-int b = 1 + 1;
-float c;
-float d = 3.4;
-string e;
-string f = "ola";
-
-z = 3;
-
-/*structures*/
-set g;
-set h = {};
-set i = {1,"ola", 3.2};
-
-list j;
-list k = [];
-list l = [1,"ola", 3.2];
-
-tuple m;
-tuple n = ();
-tuple o = (1,"ola", 3.2);
-
-dict p;
-dict q = {};
-dict r = {1:"ola", 3.2:"mundo"};
-
-while(a < 0){
-    print("while");
-}
-
-for(a = 0; a < 20; a++){
-print("oi");
-}
-repeat(5){
-    print("ola");
-}
-
-if(a == 0){
-    if(c == 3){
-        print("olaMundo");
-        for(a = 3; a == 3; a++){
-            print("reset");
-            if(c != 3){
-                print(b);
-            }
-        }
-    }
-}
-if(a == 1){
-    if(a == 0){
-        print("coco");
-        int y = 3 + 1;
-        while(y < 5){
-            y = y + 1;
-        }
-    }
-}
-
-if(b==3){
-    if(b==3){
-        if(b==3){
-            print("3");
-        }
-    }
-}
-}-
-'''
+f = open("teste1.txt")
+example = f.read()
 parse_tree = parserLark.parse(example)
 data = MyInterpreter().visit(parse_tree)
 
@@ -1447,10 +1379,6 @@ output_html = open("output.html", "w")
 geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
 data["instructions"] ,output_html, data["controlStructs"])
 
-
-with open("outTest.ntz","w") as file:
-    file.write(data["code"])
-
 html_header = '''<!DOCTYPE html>
 <html>
     <style>
@@ -1496,7 +1424,7 @@ html_header = '''<!DOCTYPE html>
             left: 20%;
             margin-left: -5px;
             border-width: 5px;
-            1border-style: solid;
+            border-style: solid;
             border-color: #555 transparent transparent transparent;
         }
 
