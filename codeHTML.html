@@ -84,9 +84,6 @@
 	string f = "ola";
 </p>
 <p class="code">
-	int teste = 4;
-</p>
-<p class="code">
 	<div class="error">z = 3<span class="errortext">Variable undeclared</span></div>;
 </p>
 <p class="comment">
@@ -118,6 +115,9 @@
 </p>
 <p class="code">
 	tuple o = (1, "ola", 3.2);
+</p>
+<p class="code">
+	int y = 3;
 </p>
 <p class="code">
 	dict p;
@@ -198,7 +198,7 @@
 			print("coco");
 </p>
 <p class="code">
-			int y = 3 + 1;
+			<div class="error">int y = 3 + 1<span class="errortext">Variable declared more than once!</span></div>;
 </p>
 <p class="code">
 			while(y < 5){
@@ -225,7 +225,43 @@
 			if(b == 3){
 </p>
 <p class="code">
+				int x = 3 + 1;
+</p>
+<p class="code">
+				set teste = {};
+</p>
+<p class="code">
+				x = 5;
+</p>
+<p class="code">
 				print("3");
+</p>
+<p class="code">
+				if(x == 3){
+</p>
+<p class="code">
+					print("deu?");
+</p>
+<p class="code">
+				}
+</p>
+<p class="code">
+				for(x = 0; x < 5; x++){
+</p>
+<p class="code">
+					print("5");
+</p>
+<p class="code">
+				}
+</p>
+<p class="code">
+				repeat(6){
+</p>
+<p class="code">
+					print("repeat");
+</p>
+<p class="code">
+				}
 </p>
 <p class="code">
 			}

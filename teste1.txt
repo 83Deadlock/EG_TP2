@@ -24,6 +24,8 @@ tuple m;
 tuple n = ();
 tuple o = (1,"ola", 3.2);
 
+int y = 3;
+
 dict p;
 dict q = {};
 dict r = {1:"ola", 3.2:"mundo"};
@@ -63,7 +65,19 @@ if(a == 1){
 if(b==3){
     if(b==3){
         if(b==3){
+            int x = 3 + 1;
+            set teste = {};
+            x = 5;
             print("3");
+            if(x == 3){
+                print("deu?");
+            }
+            for(x = 0; x < 5; x++){
+                print("5");
+            }
+            repeat(6){
+                print("repeat");
+            }
         }
     }
 }

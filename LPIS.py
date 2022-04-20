@@ -23,7 +23,7 @@ class MyInterpreter (Interpreter):
         self.ifCat = ""
         self.body_cat = False
         self.bodyCat = ""
-
+        self.sugestoes = {}
 
         self.if_parts = {}
         self.code = ""
@@ -38,11 +38,9 @@ class MyInterpreter (Interpreter):
         # STRUCT_VARS = {VARNAME : (TYPE,SIZE,VALUE,USED?)}
 
         self.nrStructs = dict()
-
-        self.TAG = "-=ANALYZER=-"
+        # NR_STRUCTS = {ID : (TYPE, ACTIVE, PARENT_STRUCTS)}
 
     def start(self,tree):
-        print(self.TAG + "\n\tSTART")
         self.code += "-{\n"
         self.html_body += "<pre><body>\n<p class=\"code\">\n-{\n</p>\n"
         self.ident_level += 1
@@ -50,7 +48,6 @@ class MyInterpreter (Interpreter):
         self.ident_level -= 1
         self.html_body += "<p class=\"code\">\n}-\n</p>\n"
         self.code += "}-\n"
-        print(self.TAG + "\n\tFINISH")
         
         for var in self.atomic_vars.keys():
             if var not in self.warnings.keys():
@@ -75,22 +72,37 @@ class MyInterpreter (Interpreter):
             if self.struct_vars[var][3] == 0:
                 self.warnings[var].append("Variable \"" + var + "\" was never used.")
 
-        self.output["atomic_vars"] = self.atomic_vars
-        self.output["struct_vars"] = self.struct_vars
+        self.output["atomic_vars"] = dict(self.atomic_vars)
+        self.output["struct_vars"] = dict(self.struct_vars)
         self.output["correct"] = self.correct
-        self.output["errors"] = self.errors
-        self.output["warnings"] = self.warnings
+        erros = dict()
+        for k,v in self.errors.items():
+            erros[k] = []
+            for s in v:
+                erros[k].append(s)
+
+        warns = dict()
+        for k,v in self.warnings.items():
+            warns[k] = []
+            for s in v:
+                warns[k].append(s)
+
+        self.output["errors"] = erros
+        self.output["warnings"] = warns
         self.output["if_count"] = self.if_count
         self.output["if_depth"] = self.if_depth
         self.output["nrStructs"] = self.nrStructs
-        self.output["instructions"] = self.instructions
+        self.output["instructions"] = dict(self.instructions)
         self.output["controlStructs"] = dict(self.controlStructs)
         self.output["if_parts"] = self.if_parts
         self.output["code"] = self.code
         self.output["html_body"] = self.html_body
+        self.output["sugestoes"] = self.sugestoes
 
         self.if_strings = {}
         self.if_bodys = {}
+
+        # IF CONCAT
 
         for i in self.if_parts.keys():
             self.if_concat = True
@@ -103,6 +115,7 @@ class MyInterpreter (Interpreter):
 
         for i in self.if_parts.keys():
             self.body_cat = True
+            self.ident_level = 0
             self.visit(self.if_parts[i][1])
             self.if_bodys[i] = self.bodyCat
             self.bodyCat = ""
@@ -148,27 +161,67 @@ class MyInterpreter (Interpreter):
         for k in removeKeys:
             auxIfs.pop(k)
 
-        sugestoes = {} 
         
+        finalDict = {}
+
         for k,l in auxIfs.items():
+            last = False
+            for v in l:
+                if len(self.if_parts[v][1].children[1].children) > 1:
+                    if k not in finalDict.keys():
+                        finalDict[k] = []
+                    finalDict[k].append(v)
+                    last = True 
+                elif not last:
+                    if k not in finalDict.keys():
+                        finalDict[k] = []
+                    finalDict[k].append(v)
+
+        for k,l in finalDict.items():
             condS = self.if_strings[k]
 
             for v in l:
                 condS += " & " + self.if_strings[v]
 
+        for k,v in finalDict.items():
+            i = 1
+            keyC = "if(" + self.if_strings[k] + "){\n"
+            for elem in v:
+                for t in range(i):
+                    keyC += "\t"
+                keyC += "if(" + self.if_strings[elem] + "){\n"
+                i += 1
+
+
+            body = self.if_bodys[max(v)][2:len(self.if_bodys[max(v)])-2]
+            bodyLines = body.split("\n")
+
+            for line in bodyLines:
+                for t in range(i-1):
+                    keyC += "\t"
+                keyC += line + "\n"
             
+            for elem in v:
+                i -= 1
+                for t in range(i):
+                    keyC += "\t"
+                keyC += "}\n"
+            keyC += "}"
 
-            bodyS = self.if_bodys[max(l)]
-            print(str(k) + " =>\n\tCOND =>\n\t\t"+condS+"\n\tBODY =>\n\t"+bodyS)
+            valueC = "if((" + self.if_strings[k] + ")"
 
+            for elem in v:
+                valueC += " & (" + self.if_strings[elem] + ")"
+            
+            valueC += ")" + self.if_bodys[max(v)]
 
+            self.sugestoes[keyC] = valueC
 
         return self.output
 
     def program(self, tree):
         for c in tree.children:
             self.visit(c)
-
         pass
 
     def instruction(self,tree):
@@ -179,6 +232,8 @@ class MyInterpreter (Interpreter):
     def comment(self, tree):
         comment = tree.children[0].value
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += comment + "\n"
         else:
             self.code += comment + "\n"
@@ -224,6 +279,8 @@ class MyInterpreter (Interpreter):
             flag = True
 
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += var_type + " " + var_name
         else:
             self.code += var_type + " " + var_name
@@ -307,6 +364,8 @@ class MyInterpreter (Interpreter):
         sizeS = 0
 
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "set " + tree.children[0].value
         else:
             self.code += "set " + tree.children[0].value
@@ -362,6 +421,8 @@ class MyInterpreter (Interpreter):
         childs = len(tree.children)
         sizeL = 0
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "list " + tree.children[0].value
         else:
             self.code += "list " + tree.children[0].value
@@ -417,6 +478,8 @@ class MyInterpreter (Interpreter):
         sizeT = 0
         childs = len(tree.children)
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "tuple " + tree.children[0].value
         else:
             self.code += "tuple " + tree.children[0].value
@@ -471,6 +534,8 @@ class MyInterpreter (Interpreter):
         childs = len(tree.children)
         sizeD = 0
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "dict " + tree.children[0].value
         else:
             self.code += "dict " + tree.children[0].value
@@ -534,6 +599,8 @@ class MyInterpreter (Interpreter):
                 self.html_body += "\t"
             self.code += tree.children[0].value + " = "
         else:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += tree.children[0].value + " = "
 
         if str(tree.children[0]) not in self.errors.keys():
@@ -609,6 +676,8 @@ class MyInterpreter (Interpreter):
             self.html_body += "print("
             self.code += "print("
         else:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "print("
 
         if tree.children[1].type == "VARNAME":
@@ -662,6 +731,8 @@ class MyInterpreter (Interpreter):
             self.html_body += "read("
             self.code += "read(" + tree.children[1].value
         else:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "read(" + tree.children[1].value
 
         if str(tree.children[1]) not in self.errors.keys():
@@ -725,11 +796,11 @@ class MyInterpreter (Interpreter):
         self.if_count += 1
         self.if_depth[self.if_count] = self.nivel_if
 
-        
-
         l = len(tree.children)
 
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "if("
         else:
             self.code += "if("
@@ -780,6 +851,8 @@ class MyInterpreter (Interpreter):
         self.inCicle = True
 
         if self.body_cat:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat +=  "while("
         else:
             self.code += "while("
@@ -825,6 +898,9 @@ class MyInterpreter (Interpreter):
             self.html_body += "<p class=\"code\">\n"
             for i in range(self.ident_level):
                 self.html_body += "\t"
+        else:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
 
         for c in tree.children:
             if c != "for" and c != "(" and c != ")" and c != ";" and c != ",":
@@ -900,6 +976,8 @@ class MyInterpreter (Interpreter):
             self.code += "repeat(" + tree.children[2].value + ")"
             self.html_body += "repeat(" + tree.children[2].value + ")"
         else:
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "repeat(" + tree.children[2].value + ")"
 
         self.visit(tree.children[4])
@@ -919,6 +997,7 @@ class MyInterpreter (Interpreter):
             self.nivel_if += 1
         if self.body_cat:
             self.bodyCat += "{\n"
+            self.ident_level += 1
         else:
             self.code += "{\n"
             self.ident_level += 1
@@ -943,7 +1022,10 @@ class MyInterpreter (Interpreter):
                 for i in range(self.ident_level):
                     self.html_body += "\t"
             self.html_body += "}\n</p>\n"
-        else:
+        else: 
+            self.ident_level -= 1
+            for i in range(self.ident_level):
+                self.bodyCat += "\t"
             self.bodyCat += "}\n"
         pass
 
