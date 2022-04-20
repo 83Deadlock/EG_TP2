@@ -83,7 +83,7 @@ class MyInterpreter (Interpreter):
         self.output["if_depth"] = self.if_depth
         self.output["nrStructs"] = self.nrStructs
         self.output["instructions"] = self.instructions
-        self.output["controlStructs"] = self.controlStructs
+        self.output["controlStructs"] = dict(self.controlStructs)
         self.output["if_parts"] = self.if_parts
         self.output["code"] = self.code
         self.output["html_body"] = self.html_body
