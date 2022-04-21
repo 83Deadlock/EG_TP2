@@ -1586,9 +1586,10 @@ def geraSugestao(sugestoes, output_html):
     output_html.write("</tr>")
 
     for sugestao in sugestoes.keys():
+        sug = sugestao.replace("\t","\" + \t \"")
         output_html.write("<tr>")
-        output_html.write("<td>" + sugestao + "</td>")
-        output_html.write("<td>" + sugestoes[sugestao] + "</td>")
+        output_html.write("<td><span style=\"white-space: pre-wrap\">" + sugestao + "</span></td>")
+        output_html.write("<td><span style=\"white-space: pre-wrap\">" + sugestoes[sugestao] + "</span></td>")
         output_html.write("</tr>")
 
     output_html.write("</table>")
@@ -1597,3 +1598,6 @@ def geraSugestao(sugestoes, output_html):
 
 output_html = open("sugestao.html", "w")
 geraSugestao(data["sugestoes"], output_html)
+
+for k,v in data["sugestoes"].items(): 
+    print(k + "\n------\n" + v)
