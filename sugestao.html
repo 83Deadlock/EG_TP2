@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css"><title>EG - TP2</title></head><body>
+    <div class="w3-top">
+            <div class="w3-bar w3-yellow intronav">
+                <header>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
+                </header>
+            </div>
+        </div>
+    <h1> Sugestões para If's aninhados</h1><table class="w3-table w3-table-all w3-hoverable"><tr class="w3-yellow"><th>Original</th><th>Sugestão</th></tr><tr><td>if(a == 0){
+	if(c == 3){
+		print("olaMundo");
+		for(a = 3; a == 3; a++){
+			print("reset");
+			if(c != 3){
+				print(b);
+			}
+		}
+	
+	}
+}</td><td>if((a == 0) & (c == 3)){
+	print("olaMundo");
+	for(a = 3; a == 3; a++){
+		print("reset");
+		if(c != 3){
+			print(b);
+		}
+	}
+}
+</td></tr><tr><td>if(a == 1){
+	if(a == 0){
+		print("coco");
+		int y = 3 + 1;
+		while(y < 5){
+			y = y + 1;
+		}
+	
+	}
+}</td><td>if((a == 1) & (a == 0)){
+	print("coco");
+	int y = 3 + 1;
+	while(y < 5){
+		y = y + 1;
+	}
+}
+</td></tr><tr><td>if(b == 3){
+	if(b == 3){
+		if(b == 3){
+			int x = 3 + 1;
+			set teste = {};
+			x = 5;
+			print("3");
+			if(x == 3){
+				print("deu?");
+			}
+			for(x = 0; x < 5; x++){
+				print("5");
+			}
+			repeat(6){
+				print("repeat");
+			}
+		
+		}
+	}
+}</td><td>if((b == 3) & (b == 3) & (b == 3)){
+	int x = 3 + 1;
+	set teste = {};
+	x = 5;
+	print("3");
+	if(x == 3){
+		print("deu?");
+	}
+	for(x = 0; x < 5; x++){
+		print("5");
+	}
+	repeat(6){
+		print("repeat");
+	}
+}
+</td></tr></table></body></html>

@@ -1552,3 +1552,48 @@ html = html_header + "<body>\n" + navbar +data["html_body"] + "\n</body></html>"
 
 with open("codeHTML.html","w") as out:
     out.write(html)
+
+def geraSugestao(sugestoes, output_html):
+    output_html.write("<!DOCTYPE html>")
+    output_html.write("<html lang=\"pt\">")
+    output_html.write("<head>")
+    output_html.write("<meta charset=\"UTF-8\">")
+    output_html.write("<link rel=\"stylesheet\" href=\"https://www.w3schools.com/w3css/4/w3.css\">")
+    output_html.write("<title>EG - TP2</title>")
+    output_html.write("</head>")
+
+    output_html.write("<body>")
+    
+    navbar = '''
+    <div class="w3-top">
+            <div class="w3-bar w3-yellow intronav">
+                <header>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
+                </header>
+            </div>
+        </div>
+    '''
+
+    output_html.write(navbar)
+
+    output_html.write("<h1> Sugestões para If's aninhados</h1>")
+    output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
+    output_html.write("<tr class=\"w3-yellow\">")
+    output_html.write("<th>Original</th>")
+    output_html.write("<th>Sugestão</th>")
+    output_html.write("</tr>")
+
+    for sugestao in sugestoes.keys():
+        output_html.write("<tr>")
+        output_html.write("<td>" + sugestao + "</td>")
+        output_html.write("<td>" + sugestoes[sugestao] + "</td>")
+        output_html.write("</tr>")
+
+    output_html.write("</table>")
+    output_html.write("</body>")
+    output_html.write("</html>")
+
+output_html = open("sugestao.html", "w")
+geraSugestao(data["sugestoes"], output_html)
