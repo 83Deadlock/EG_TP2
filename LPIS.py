@@ -1323,6 +1323,21 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
     output_html.write("</head>")
 
     output_html.write("<body>")
+    
+    navbar = '''
+    <div class="w3-top">
+            <div class="w3-bar w3-yellow intronav">
+                <header>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
+                </header>
+            </div>
+        </div>
+    '''
+
+    output_html.write(navbar)
+
     output_html.write("<h1> Tabela com todas as variáveis atómicas do programa </h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
@@ -1514,9 +1529,26 @@ html_header = '''<!DOCTYPE html>
             visibility: visible;
             opacity: 1;
         }
-    </style>'''
+    </style>
+    <head>
+        <link rel=\"stylesheet\" href=\"https://www.w3schools.com/w3css/4/w3.css\">
+        <title>EG - TP2</title>
+    </head>
+    '''
 
-html = html_header + "<body>\n" + data["html_body"] + "\n</body></html>"
+navbar = '''
+    <div class="w3-top">
+            <div class="w3-bar w3-yellow intronav">
+                <header>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
+                </header>
+            </div>
+        </div>
+    '''
+
+html = html_header + "<body>\n" + navbar +data["html_body"] + "\n</body></html>"
 
 with open("codeHTML.html","w") as out:
     out.write(html)
