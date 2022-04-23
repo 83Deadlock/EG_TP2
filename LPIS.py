@@ -1598,6 +1598,3 @@ def geraSugestao(sugestoes, output_html):
 
 output_html = open("sugestao.html", "w")
 geraSugestao(data["sugestoes"], output_html)
-
-for k,v in data["sugestoes"].items(): 
-    print(k + "\n------\n" + v)
