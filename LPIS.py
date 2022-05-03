@@ -1,6 +1,7 @@
 from dataclasses import InitVar
 from doctest import Example
 from mimetypes import init
+import sys
 from lark import Discard
 from lark import Lark,Token,Tree
 from lark.tree import pydot__tree_to_png
@@ -8,43 +9,51 @@ from lark.visitors import Interpreter
 
 class MyInterpreter (Interpreter):
     def __init__(self):
+        # Dictionary where we'll store all relevant fields to return from the Interpreter
         self.output = {}
+        # We'll keep two dictionaries (one for warnings, one for errors) where the key is the variable's name and the value is a list with warnings or errors on that variable.
         self.warnings = {}
         self.errors = {}
+        # This flag indicates if the program's syntax or semanthics are correct
         self.correct = True
-        self.inCicle = False
-        self.if_count = 0
-        self.if_depth = {}
-        self.nivel_if = 0
+        # Dict where the keys are the type of instructions and the values are a simple counter, to know how many of each type of instruction we have in the current program 
         self.instructions = {}
+        # Counter for flow control structures (if, while, for and repeat). Will serve as an ID
         self.controlID = 0
+        # Key is ID of the control structure, value is a tuple with 3 fields: type (if/while/for/repeat), active (True/False) and Parents (list with higher hierarchy structure's IDs)
         self.controlStructs = {}
+        # Flag to see if we're concatenating the boolean expressions from coditional control structures
         self.if_concat = False
+        # String where we'll concat the boolean expressions from coditional control structures
         self.ifCat = ""
+        # Flag to see if we're concatenating the body from coditional control structures
         self.body_cat = False
+        # String where we'll concat the body from coditional control structures
         self.bodyCat = ""
-        self.sugestoes = {}
-
+        # Key will be the original version of a control structure, value will be a nested version of the key
+        self.suggestions = {}
+        # Keys are control structure IDs, values are tuples with two fields: ID's boolean expression, ID's body
         self.if_parts = {}
+        # String used to reconstruct the code
         self.code = ""
+        # String used to format the code to show erros and reconstruct the code
         self.html_body = ""
-
+        # Used to determine the level of ident for each line of code
         self.ident_level = 0
-
+        # Key is the name of an atomic variable, value is a tuple of 4 fields: Type (int/float/string), Value, Init (True/False), Used (True/False)
         self.atomic_vars = dict()
-        # ATOMIC_VARS = {VARNAME : (TYPE,VALUE,INIT?,USED?)}
-
+        # Key is the name of a structural variable, value is a tuple of 4 fields: Type (list/set/tuple/dict), Size (#elems), Value, Used (True/False)
         self.struct_vars = dict()
-        # STRUCT_VARS = {VARNAME : (TYPE,SIZE,VALUE,USED?)}
-
+        # We used this dictionary to know how many of each type of conotrol structure we have in each program
         self.nrStructs = dict()
-        # NR_STRUCTS = {ID : (TYPE, ACTIVE, PARENT_STRUCTS)}
 
     def start(self,tree):
         self.code += "-{\n"
         self.html_body += "<pre><body>\n<p class=\"code\">\n-{\n</p>\n"
         self.ident_level += 1
+
         self.visit(tree.children[1])
+        
         self.ident_level -= 1
         self.html_body += "<p class=\"code\">\n}-\n</p>\n"
         self.code += "}-\n"
@@ -74,7 +83,9 @@ class MyInterpreter (Interpreter):
 
         self.output["atomic_vars"] = dict(self.atomic_vars)
         self.output["struct_vars"] = dict(self.struct_vars)
+
         self.output["correct"] = self.correct
+        
         erros = dict()
         for k,v in self.errors.items():
             erros[k] = []
@@ -89,15 +100,12 @@ class MyInterpreter (Interpreter):
 
         self.output["errors"] = erros
         self.output["warnings"] = warns
-        self.output["if_count"] = self.if_count
-        self.output["if_depth"] = self.if_depth
         self.output["nrStructs"] = self.nrStructs
         self.output["instructions"] = dict(self.instructions)
         self.output["controlStructs"] = dict(self.controlStructs)
-        self.output["if_parts"] = self.if_parts
         self.output["code"] = self.code
         self.output["html_body"] = self.html_body
-        self.output["sugestoes"] = self.sugestoes
+        self.output["suggestions"] = self.suggestions
 
         self.if_strings = {}
         self.if_bodys = {}
@@ -215,7 +223,7 @@ class MyInterpreter (Interpreter):
             
             valueC += ")" + self.if_bodys[max(v)]
 
-            self.sugestoes[keyC] = valueC
+            self.suggestions[keyC] = valueC
 
         return self.output
 
@@ -779,7 +787,7 @@ class MyInterpreter (Interpreter):
                 self.html_body += "\t"
 
 
-        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
+        # Get every active structures and consider the current as their child
         parents = []
         for id in self.controlStructs.keys():
             if self.controlStructs[id][1] == 1:
@@ -787,14 +795,8 @@ class MyInterpreter (Interpreter):
 
         if not self.body_cat:
             self.if_parts[self.controlID] = (tree.children[2],tree.children[4])
-        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
             self.controlStructs[(self.controlID)] = tuple(["if",1,parents])
-        # Incrementamos o ID para a proxima estrutura de controlo
         self.controlID += 1
-
-        # Usamos o contador de ifs para definir os ids das estruturas de controlo
-        self.if_count += 1
-        self.if_depth[self.if_count] = self.nivel_if
 
         l = len(tree.children)
 
@@ -835,20 +837,13 @@ class MyInterpreter (Interpreter):
             for i in range(self.ident_level):
                 self.html_body += "\t"
 
-        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
         parents = []
         for id in self.controlStructs.keys():
             if self.controlStructs[id][1] == 1:
                 parents.append(id)
 
-        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
         self.controlStructs[self.controlID] = tuple(["while",1,parents])
-        # Incrementamos o ID para a proxima estrutura de controlo
         self.controlID += 1
-
-        aux = self.nivel_if 
-        self.nivel_if = 0
-        self.inCicle = True
 
         if self.body_cat:
             for i in range(self.ident_level):
@@ -868,8 +863,6 @@ class MyInterpreter (Interpreter):
 
         self.visit(tree.children[4])
         
-        self.inCicle = False
-        self.nivel_if = aux
 
         pass
 
@@ -879,20 +872,14 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["for"] += 1
 
-        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
         parents = []
         for id in self.controlStructs.keys():
             if self.controlStructs[id][1] == 1:
                 parents.append(id)
 
-        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
         self.controlStructs[self.controlID] = tuple(["for",1,parents])
-        # Incrementamos o ID para a proxima estrutura de controlo
         self.controlID += 1
 
-        aux = self.nivel_if 
-        self.nivel_if = 0
-        self.inCicle = True
 
         if not self.body_cat:
             self.html_body += "<p class=\"code\">\n"
@@ -918,8 +905,6 @@ class MyInterpreter (Interpreter):
                         self.code += " "
                         self.html_body += " "
         
-        self.inCicle = False
-        self.nivel_if = aux
 
         pass
 
@@ -953,20 +938,14 @@ class MyInterpreter (Interpreter):
         else:
             self.instructions["repeat"] += 1
 
-        # Vamos buscar todas as estruturas que estão ativas (ainda nao foram fechadas) e consideramos que a estrutura está aninhada dentro delas
         parents = []
         for id in self.controlStructs.keys():
             if self.controlStructs[id][1] == 1:
                 parents.append(id)
 
-        # Pomos no dict um tuplo com o tipo da estrutura de controlo, uma flag que nos diz que está ativa e a lista das estruturas de hierarquia superior 
         self.controlStructs[self.controlID] = tuple(["repeat",1,parents])
-        # Incrementamos o ID para a proxima estrutura de controlo
         self.controlID += 1
 
-        aux = self.nivel_if 
-        self.nivel_if = 0
-        self.inCicle = True
         
         if not self.body_cat:
             self.html_body += "<p class=\"code\">\n"
@@ -982,19 +961,16 @@ class MyInterpreter (Interpreter):
 
         self.visit(tree.children[4])
         
-        self.inCicle = False
-        self.nivel_if = aux
 
         pass
 
     def body(self,tree):
+
         self.visit_children(tree)
 
         pass
 
     def open(self,tree):
-        if not self.inCicle:
-            self.nivel_if += 1
         if self.body_cat:
             self.bodyCat += "{\n"
             self.ident_level += 1
@@ -1006,8 +982,6 @@ class MyInterpreter (Interpreter):
         pass
 
     def close(self,tree):
-        self.nivel_if -= 1
-
         newDict = dict(filter(lambda elem: elem[1][1] == 1, self.controlStructs.items()))
 
         if len(newDict.keys()) > 0:
@@ -1178,7 +1152,6 @@ class MyInterpreter (Interpreter):
                 self.ifCat += str(r)
             elif self.body_cat:
                 self.bodyCat += str(r)
-                #print("r => " + str(r))
             else:
                 self.code += str(r)
                 self.html_body += str(r)
@@ -1195,7 +1168,6 @@ class MyInterpreter (Interpreter):
                     self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Undeclared Variable</span></div>"
                 r = -1
             elif self.atomic_vars[str(tree.children[0])][2] == 0:
-                #print(tree.children[0].value + " -> " + str(self.atomic_vars[str(tree.children[0])]))
                 self.errors[str(tree.children[0])].add("Variable \"" + str(tree.children[0]) + "\" was never initialized")
                 if not self.if_concat and not self.body_cat:
                     self.html_body += "<div class=\"error\">"+tree.children[0].value+"<span class=\"errortext\">Variable was never initialized</span></div>"
@@ -1307,11 +1279,6 @@ ELSE: "else"
 %ignore WS
 '''
 
-parserLark = Lark(grammar)
-f = open("teste1.txt")
-example = f.read()
-parse_tree = parserLark.parse(example)
-data = MyInterpreter().visit(parse_tree)
 
 def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, output_html, control):
     output_html.write("<!DOCTYPE html>")
@@ -1328,9 +1295,9 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
     <div class="w3-top">
             <div class="w3-bar w3-yellow intronav">
                 <header>
-                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
-                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
-                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Code Analysis</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Original Code</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Nested If's Suggestions</a>
                 </header>
             </div>
         </div>
@@ -1338,14 +1305,14 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
 
     output_html.write(navbar)
 
-    output_html.write("<h1> Tabela com todas as variáveis atómicas do programa </h1>")
+    output_html.write("<h1>Table with program's atomic variables</h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
-    output_html.write("<th>Variável</th>")
-    output_html.write("<th>Tipo</th>")
-    output_html.write("<th>Valor</th>")
+    output_html.write("<th>Variable</th>")
+    output_html.write("<th>Type</th>")
+    output_html.write("<th>Value</th>")
     output_html.write("<th>Warnings</th>")
-    output_html.write("<th>Erros</th>")
+    output_html.write("<th>Errors</th>")
     output_html.write("</tr>")
 
     for var in atomic_vars.keys():
@@ -1355,7 +1322,7 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         output_html.write("<td>" + str(atomic_vars[var][1]) + "</td>")
         if var in warnings.keys():
             if len(warnings[var]) == 0:
-                output_html.write("<td>Sem warnings associados</td>")
+                output_html.write("<td>No warnings</td>")
             else:
                 w = ""
                 for string in warnings[var]:
@@ -1364,7 +1331,7 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         
         if var in errors.keys():
             if len(errors[var]) == 0:
-                output_html.write("<td>Sem erros associados</td>")
+                output_html.write("<td>No errors</td>")
             else:
                 erros = ""
                 for erro in errors[var]:
@@ -1374,13 +1341,13 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         output_html.write("</tr>")
     output_html.write("</table>")
 
-    output_html.write("<h1> Tabela com todas as estruturas do programa </h1>")
+    output_html.write("<h1>Tabel with program's structural variables</h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
-    output_html.write("<th>Variável</th>")
-    output_html.write("<th>Tipo</th>")
-    output_html.write("<th>Tamanho</th>")
-    output_html.write("<th>Valor</th>")
+    output_html.write("<th>Variable</th>")
+    output_html.write("<th>Type</th>")
+    output_html.write("<th>Size</th>")
+    output_html.write("<th>Value</th>")
     output_html.write("<th>Warnings</th>")
     output_html.write("</tr>")
 
@@ -1393,7 +1360,7 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
 
         if var in warnings.keys():
             if len(warnings[var]) == 0:
-                output_html.write("<td>Sem warnings associados</td>")
+                output_html.write("<td>No warnings</td>")
             else:
                 w = ""
                 for string in warnings[var]:
@@ -1404,13 +1371,13 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
 
     output_html.write("</table>")
 
-    output_html.write("<h1> Total de variáveis do programa: " + str(len(atomic_vars.keys()) + len(struct_vars.keys())) + "</h1>")
+    output_html.write("<h1> Total number of program variables: " + str(len(atomic_vars.keys()) + len(struct_vars.keys())) + "</h1>")
 
-    output_html.write("<h1> Tipos de dados estruturados usados </h1>")
+    output_html.write("<h1> Structural data types used</h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
-    output_html.write("<th>Tipo</th>")
-    output_html.write("<th>Número</th>")
+    output_html.write("<th>Type</th>")
+    output_html.write("<th>Amount</th>")
     output_html.write("</tr>")
 
     for type in nrStructs.keys():
@@ -1421,11 +1388,11 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
 
     output_html.write("</table>")
 
-    output_html.write("<h1> Número total de instruções </h1>")
+    output_html.write("<h1> Total amount of instructions </h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
-    output_html.write("<th>Instrução</th>")
-    output_html.write("<th>Número</th>")
+    output_html.write("<th>Instruction</th>")
+    output_html.write("<th>Amount</th>")
     output_html.write("</tr>")
 
     total = 0
@@ -1443,7 +1410,7 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
 
     ##
 
-    output_html.write("<h1> Estruturas de controlo </h1>")
+    output_html.write("<h1> Control Structures </h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
     output_html.write("<th>ID</th>")
@@ -1458,100 +1425,17 @@ def geraHTML(atomic_vars, struct_vars, warnings, errors, nrStructs, instrucoes, 
         output_html.write("<td>" + str(c) + "</td>")
         output_html.write("<td>" + str(control[c][0]) + "</td>")
         if len(control[c][2]) == 0:
-            output_html.write("<td>Sem parents associados</td>")
+            output_html.write("<td>No parents</td>")
         else:
             id = ""
             for ids in control[c][2]:
                 id += str(ids) + " | "
-            output_html.write("<td>ID's dos ciclos associados: " + id + "</td>")
+            output_html.write("<td>Parents' IDs: " + id + "</td>")
         output_html.write("</tr>")
         total += 1
 
     output_html.write("</body>")
     output_html.write("</html>")
-
-output_html = open("output.html", "w")
-
-#1 e 2 e 3
-geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"],
-data["instructions"] ,output_html, data["controlStructs"])
-
-html_header = '''<!DOCTYPE html>
-<html>
-    <style>
-        .error {
-            position: relative;
-            display: inline-block;
-            border-bottom: 1px dotted black;
-            color: red;
-        }
-
-        .code {
-            position: relative;
-            display: inline-block;
-        }
-
-        .comment {
-            position: relative;
-            display: inline-block;
-            color: grey;
-        }
-
-        .error .errortext {
-            visibility: hidden;
-            width: 200px;
-            background-color: #555;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px 0;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -40px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .error .errortext::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 20%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #555 transparent transparent transparent;
-        }
-
-        .error:hover .errortext {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
-    <head>
-        <link rel=\"stylesheet\" href=\"https://www.w3schools.com/w3css/4/w3.css\">
-        <title>EG - TP2</title>
-    </head>
-    '''
-
-navbar = '''
-    <div class="w3-top">
-            <div class="w3-bar w3-yellow intronav">
-                <header>
-                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
-                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
-                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
-                </header>
-            </div>
-        </div>
-    '''
-
-html = html_header + "<body>\n" + navbar +data["html_body"] + "\n</body></html>"
-
-with open("codeHTML.html","w") as out:
-    out.write(html)
 
 def geraSugestao(sugestoes, output_html):
     output_html.write("<!DOCTYPE html>")
@@ -1568,9 +1452,9 @@ def geraSugestao(sugestoes, output_html):
     <div class="w3-top">
             <div class="w3-bar w3-yellow intronav">
                 <header>
-                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Análise do Código</a>
-                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Código Original</a>   
-                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Sugestão If's</a>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Code Analysis</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Original Code</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Nested If's Suggestions</a>
                 </header>
             </div>
         </div>
@@ -1578,11 +1462,11 @@ def geraSugestao(sugestoes, output_html):
 
     output_html.write(navbar)
 
-    output_html.write("<h1> Sugestões para If's aninhados</h1>")
+    output_html.write("<h1> Nested Ifs' Suggestions</h1>")
     output_html.write("<table class=\"w3-table w3-table-all w3-hoverable\">")
     output_html.write("<tr class=\"w3-yellow\">")
     output_html.write("<th>Original</th>")
-    output_html.write("<th>Sugestão</th>")
+    output_html.write("<th>Suggestion</th>")
     output_html.write("</tr>")
 
     for sugestao in sugestoes.keys():
@@ -1596,5 +1480,103 @@ def geraSugestao(sugestoes, output_html):
     output_html.write("</body>")
     output_html.write("</html>")
 
-output_html = open("sugestao.html", "w")
-geraSugestao(data["sugestoes"], output_html)
+def main():
+
+    parserLark = Lark(grammar)
+    if len(sys.argv) == 1:
+        print("Insufficient arguments. Please pass the file name as an argument.")
+        return
+    
+    f = open(sys.argv[1])
+
+    code = f.read()
+
+    parse_tree = parserLark.parse(code)
+    data = MyInterpreter().visit(parse_tree)
+    
+    output_html = open("output.html", "w")
+    #1 e 2 e 3
+    geraHTML(data["atomic_vars"],data["struct_vars"], data["warnings"], data["errors"], data["nrStructs"], data["instructions"], output_html, data["controlStructs"])
+
+    html_header = '''<!DOCTYPE html>
+    <html>
+        <style>
+            .error {
+                position: relative;
+                display: inline-block;
+                border-bottom: 1px dotted black;
+                color: red;
+            }
+
+            .code {
+                position: relative;
+                display: inline-block;
+            }
+
+            .comment {
+                position: relative;
+                display: inline-block;
+                color: grey;
+            }
+
+            .error .errortext {
+                visibility: hidden;
+                width: 200px;
+                background-color: #555;
+                color: #fff;
+                text-align: center;
+                border-radius: 6px;
+                padding: 5px 0;
+                position: absolute;
+                z-index: 1;
+                bottom: 125%;
+                left: 50%;
+                margin-left: -40px;
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+
+            .error .errortext::after {
+                content: "";
+                position: absolute;
+                top: 100%;
+                left: 20%;
+                margin-left: -5px;
+                border-width: 5px;
+                border-style: solid;
+                border-color: #555 transparent transparent transparent;
+            }
+
+            .error:hover .errortext {
+                visibility: visible;
+                opacity: 1;
+            }
+        </style>
+        <head>
+            <link rel=\"stylesheet\" href=\"https://www.w3schools.com/w3css/4/w3.css\">
+            <title>EG - TP2</title>
+        </head>
+        '''
+
+    navbar = '''
+    <div class="w3-top">
+            <div class="w3-bar w3-yellow intronav">
+                <header>
+                        <a href="output.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Code Analysis</a>
+                        <a href="codeHTML.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Original Code</a>   
+                        <a href="sugestao.html" class="w3-bar-item w3-button w3-hover-black w3-padding-16 w3-text-black w3-hover-text-white w3-xlarge">Nested If's Suggestions</a>
+                </header>
+            </div>
+        </div>
+    '''
+
+    html = html_header + "<body>\n" + navbar + data["html_body"] + "\n</body></html>"
+
+    with open("codeHTML.html","w") as out:
+        out.write(html)
+
+    output_html = open("sugestao.html", "w")
+    geraSugestao(data["suggestions"], output_html)
+
+if __name__ == "__main__":
+    main()

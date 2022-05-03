@@ -76,7 +76,7 @@ if(b==3){
                 print("5");
             }
             repeat(6){
-                print("repeat");
+                print(a);
             }
         }
     }
